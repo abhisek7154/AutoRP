@@ -4,13 +4,14 @@ using Microsoft.Extensions.Logging;
 
 namespace AutoRP.Services;
 
-public sealed class PresenceCoordinator
+public sealed class PresenceCoordinator : IDisposable
 {
     private readonly IDiscordRpcService discordRpcService;
     private readonly AutoSwitchService autoSwitchService;
     private readonly ISettingsService settingsService;
     private readonly AutoRpOptions options;
     private readonly ILogger<PresenceCoordinator> logger;
+    private int isDisposed;
 
     public event EventHandler<AutoSwitchStateChangedEventArgs>? AutomaticSwitchingStateChanged;
 
@@ -32,6 +33,7 @@ public sealed class PresenceCoordinator
 
     public async Task StartAsync(CancellationToken cancellationToken = default)
     {
+        ObjectDisposedException.ThrowIf(Volatile.Read(ref isDisposed) != 0, this);
         await discordRpcService.ConnectAsync(cancellationToken);
         autoSwitchService.Start();
         logger.LogInformation("AutoRP monitoring is ready with a {PollingInterval} polling interval.", options.PollingInterval);
@@ -42,6 +44,17 @@ public sealed class PresenceCoordinator
         autoSwitchService.Stop();
         await discordRpcService.ClearPresenceAsync(cancellationToken);
         await discordRpcService.DisconnectAsync(cancellationToken);
+    }
+
+    public void Dispose()
+    {
+        if (Interlocked.Exchange(ref isDisposed, 1) != 0)
+        {
+            return;
+        }
+
+        autoSwitchService.StateChanged -= OnAutomaticSwitchingStateChanged;
+        settingsService.SettingsChanged -= OnSettingsChanged;
     }
 
     public bool IsDiscordConnected => discordRpcService.IsConnected;

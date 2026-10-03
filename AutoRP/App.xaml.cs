@@ -11,6 +11,7 @@ namespace AutoRP;
 public partial class App : Application
 {
     private ServiceProvider? serviceProvider;
+    private int shutdownStarted;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -30,8 +31,11 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
-        serviceProvider?.GetService<PresenceCoordinator>()?.StopAsync().GetAwaiter().GetResult();
-        serviceProvider?.Dispose();
+        if (Interlocked.Exchange(ref shutdownStarted, 1) == 0)
+        {
+            ShutdownServicesAsync().GetAwaiter().GetResult();
+        }
+
         base.OnExit(e);
     }
 
@@ -66,9 +70,65 @@ public partial class App : Application
         MainWindow.Activate();
     }
 
-    private void OnTrayExitRequested(object? sender, EventArgs e)
+    private async void OnTrayExitRequested(object? sender, EventArgs e)
     {
-        MainWindow?.Close();
-        Shutdown();
+        if (Interlocked.Exchange(ref shutdownStarted, 1) != 0)
+        {
+            return;
+        }
+
+        try
+        {
+            await ShutdownServicesAsync();
+        }
+        finally
+        {
+            Shutdown();
+        }
+    }
+
+    private async Task ShutdownServicesAsync()
+    {
+        var provider = serviceProvider;
+        if (provider is null)
+        {
+            return;
+        }
+
+        var trayService = provider.GetService<ITrayService>();
+        if (trayService is not null)
+        {
+            trayService.OpenRequested -= OnTrayOpenRequested;
+            trayService.ExitRequested -= OnTrayExitRequested;
+            trayService.Dispose();
+        }
+
+        var window = MainWindow;
+        if (window is not null)
+        {
+            foreach (var ownedWindow in window.OwnedWindows.OfType<Window>().ToArray())
+            {
+                ownedWindow.Close();
+            }
+
+            if (window.IsVisible)
+            {
+                window.Close();
+            }
+        }
+
+        try
+        {
+            var coordinator = provider.GetService<PresenceCoordinator>();
+            if (coordinator is not null)
+            {
+                await coordinator.StopAsync();
+            }
+        }
+        finally
+        {
+            provider.Dispose();
+            serviceProvider = null;
+        }
     }
 }

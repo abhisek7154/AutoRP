@@ -54,9 +54,17 @@ public partial class MainWindow : Window
         refreshTimer.Start();
     }
 
-    private async void OnClosed(object? sender, EventArgs e)
+    private void OnClosed(object? sender, EventArgs e)
     {
         refreshTimer.Stop();
+        Loaded -= OnLoaded;
+        Closed -= OnClosed;
+        AutomaticSwitchingCheckBox.Checked -= OnAutomaticSwitchingChanged;
+        AutomaticSwitchingCheckBox.Unchecked -= OnAutomaticSwitchingChanged;
+        StartWithWindowsCheckBox.Checked -= OnStartWithWindowsChanged;
+        StartWithWindowsCheckBox.Unchecked -= OnStartWithWindowsChanged;
+        CloseToTrayCheckBox.Checked -= OnCloseToTrayChanged;
+        CloseToTrayCheckBox.Unchecked -= OnCloseToTrayChanged;
         presenceCoordinator.AutomaticSwitchingStateChanged -= OnAutomaticSwitchingStateChanged;
         if (trayService.IsExitRequested)
         {
@@ -66,10 +74,7 @@ public partial class MainWindow : Window
         if (!settingsViewModel.CloseToTray)
         {
             Application.Current.Shutdown();
-            return;
         }
-
-        await presenceCoordinator.StopAsync();
     }
 
     private void OnClosing(object? sender, System.ComponentModel.CancelEventArgs e)
