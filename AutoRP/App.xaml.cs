@@ -11,9 +11,7 @@ namespace AutoRP;
 public partial class App : Application
 {
     private ServiceProvider? serviceProvider;
-    private int shutdownStarted;
-    private readonly object shutdownLock = new();
-    private Task? shutdownTask;
+    private ApplicationShutdownCoordinator? shutdownCoordinator;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -22,6 +20,7 @@ public partial class App : Application
         var services = new ServiceCollection();
         ConfigureServices(services);
         serviceProvider = services.BuildServiceProvider();
+        shutdownCoordinator = new ApplicationShutdownCoordinator(ShutdownServicesAsync, Shutdown);
 
         MainWindow = serviceProvider.GetRequiredService<MainWindow>();
         var trayService = serviceProvider.GetRequiredService<ITrayService>();
@@ -72,32 +71,7 @@ public partial class App : Application
         _ = ShutdownApplicationAsync();
     }
 
-    public Task ShutdownApplicationAsync()
-    {
-        lock (shutdownLock)
-        {
-            if (shutdownTask is not null)
-            {
-                return shutdownTask;
-            }
-
-            Interlocked.Exchange(ref shutdownStarted, 1);
-            shutdownTask = ShutdownCoreAsync();
-            return shutdownTask;
-        }
-    }
-
-    private async Task ShutdownCoreAsync()
-    {
-        try
-        {
-            await ShutdownServicesAsync();
-        }
-        finally
-        {
-            Shutdown();
-        }
-    }
+    public Task ShutdownApplicationAsync() => shutdownCoordinator?.ShutdownAsync() ?? Task.CompletedTask;
 
     private async Task ShutdownServicesAsync()
     {

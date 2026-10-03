@@ -144,7 +144,7 @@ public sealed class ShutdownTests
     }
 
     [Fact]
-    public void TrayExitRaisesOneShutdownRequestAndMarksExplicitExit()
+    public async Task TrayExitInvokesTheIdempotentApplicationShutdownPath()
     {
         using var loggerFactory = LoggerFactory.Create(builder => { });
         var discord = new FakeDiscordRpcService();
@@ -155,13 +155,32 @@ public sealed class ShutdownTests
             loggerFactory.CreateLogger<AutoSwitchService>());
         using var tray = new TrayService(autoSwitch, discord);
         var exitRequests = 0;
-        tray.ExitRequested += (_, _) => exitRequests++;
+        var serviceStopCalls = 0;
+        var applicationShutdownCalls = 0;
+        var shutdown = new ApplicationShutdownCoordinator(
+            () =>
+            {
+                serviceStopCalls++;
+                return Task.CompletedTask;
+            },
+            () => applicationShutdownCalls++);
+        Task? shutdownTask = null;
+        tray.ExitRequested += (_, _) =>
+        {
+            exitRequests++;
+            shutdownTask = shutdown.ShutdownAsync();
+        };
 
         tray.RequestExit();
         tray.RequestExit();
+        Assert.NotNull(shutdownTask);
+        await shutdownTask!;
+        await shutdown.ShutdownAsync();
 
         Assert.True(tray.IsExitRequested);
         Assert.Equal(1, exitRequests);
+        Assert.Equal(1, serviceStopCalls);
+        Assert.Equal(1, applicationShutdownCalls);
     }
 
     private sealed class FakeActiveWindowService : IActiveWindowService

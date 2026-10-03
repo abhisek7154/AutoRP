@@ -198,7 +198,7 @@ public sealed class TrayService : ITrayService
             return;
         }
 
-        dispatcher.BeginInvoke(DispatcherPriority.ContextIdle, new Action(() => ExitRequested?.Invoke(this, EventArgs.Empty)));
+        dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => ExitRequested?.Invoke(this, EventArgs.Empty)));
     }
 
     private void OnOpenClick(object sender, RoutedEventArgs e)
