@@ -18,6 +18,7 @@ public sealed class AutoRpOptions
             LargeImageText: "Visual Studio Code")
         {
             Name = "Visual Studio Code",
+            ActivityName = "Visual Studio Code",
             ProcessNames = ["Code.exe"],
             Priority = 10
         },
@@ -29,6 +30,7 @@ public sealed class AutoRpOptions
             LargeImageText: "Google Chrome")
         {
             Name = "Google Chrome",
+            ActivityName = "Google Chrome",
             ProcessNames = ["chrome.exe"],
             Priority = 10
         },
@@ -40,6 +42,7 @@ public sealed class AutoRpOptions
             LargeImageText: "Mozilla Firefox")
         {
             Name = "Mozilla Firefox",
+            ActivityName = "Firefox",
             ProcessNames = ["firefox.exe"],
             Priority = 20
         },
@@ -51,8 +54,48 @@ public sealed class AutoRpOptions
             LargeImageText: "Spotify")
         {
             Name = "Spotify",
+            ActivityName = "Spotify",
             ProcessNames = ["Spotify.exe"],
             Priority = 10
+        },
+        new RpcProfile(
+            ProcessName: "",
+            Details: "Browsing Netflix",
+            State: "Watching Netflix",
+            LargeImageKey: "netflix",
+            LargeImageText: "Netflix")
+        {
+            Name = "Netflix",
+            ActivityName = "Netflix",
+            ProcessNames = ["firefox.exe", "chrome.exe"],
+            WindowTitleContains = ["Netflix"],
+            Priority = 100
+        },
+        new RpcProfile(
+            ProcessName: "",
+            Details: "Watching Crunchyroll",
+            State: "Watching Crunchyroll",
+            LargeImageKey: "crunchyroll",
+            LargeImageText: "Crunchyroll")
+        {
+            Name = "Crunchyroll",
+            ActivityName = "Crunchyroll",
+            ProcessNames = ["firefox.exe", "chrome.exe"],
+            WindowTitleContains = ["Crunchyroll"],
+            Priority = 100
+        },
+        new RpcProfile(
+            ProcessName: "",
+            Details: "Listening to YouTube Music",
+            State: "Listening to YouTube Music",
+            LargeImageKey: "youtube_music",
+            LargeImageText: "YouTube Music")
+        {
+            Name = "YouTube Music",
+            ActivityName = "YouTube Music",
+            ProcessNames = ["firefox.exe", "chrome.exe"],
+            WindowTitleContains = ["YouTube Music"],
+            Priority = 100
         }
     ];
 }

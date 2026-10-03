@@ -13,6 +13,7 @@ public sealed class ProfileEditorViewModel
 
         OriginalName = profile.Name;
         Name = profile.Name;
+        ActivityName = profile.ActivityName;
         ProcessName = profile.ProcessName;
         ProcessNamesText = string.Join(Environment.NewLine, profile.ProcessNames ?? [profile.ProcessName]);
         WindowTitleContainsText = string.Join(Environment.NewLine, profile.WindowTitleContains ?? []);
@@ -30,6 +31,7 @@ public sealed class ProfileEditorViewModel
 
     public string OriginalName { get; } = string.Empty;
     public string Name { get; set; } = string.Empty;
+    public string? ActivityName { get; }
     public string ProcessName { get; set; } = string.Empty;
     public string ProcessNamesText { get; set; } = string.Empty;
     public string WindowTitleContainsText { get; set; } = string.Empty;
@@ -87,6 +89,7 @@ public sealed class ProfileEditorViewModel
             buttons)
         {
             Name = Name.Trim(),
+            ActivityName = ActivityName,
             IsEnabled = IsEnabled,
             Priority = Priority,
             ProcessNames = processNames,

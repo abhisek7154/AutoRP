@@ -216,7 +216,11 @@ public sealed class PresenceCoordinator : IDisposable
             Buttons: new[]
             {
                 new RpcButton("AutoRP project", "https://github.com/")
-            });
+            })
+        {
+            Name = "AutoRP",
+            ActivityName = "AutoRP"
+        };
     }
 
     private void OnAutomaticSwitchingStateChanged(object? sender, AutoSwitchStateChangedEventArgs e)

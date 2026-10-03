@@ -31,6 +31,8 @@ For example:
 
 `VS Code → Coding → VS Code artwork`
 
+AutoRP also changes the activity name shown in Discord to match the selected profile. Browser tabs for Netflix, Crunchyroll, and YouTube Music use the browser process together with the window title, so they can switch independently from general Firefox or Chrome browsing. Upload artwork with the matching keys (`netflix`, `crunchyroll`, or `youtube_music`) if you want those images; asset keys only display artwork after you upload them to your Discord application.
+
 ## Features
 
 - Foreground application detection through Windows APIs with low-frequency polling.
@@ -90,7 +92,7 @@ The saved UI value takes priority over `AUTORP_DISCORD_APPLICATION_ID`. Never co
 
 ## Discord Artwork
 
-AutoRP uses Discord-hosted asset keys. The seeded profiles use `firefox`, `vscode`, `spotify`, and `chrome`; the sample presence uses `autorp_anime`. These are examples and do not exist automatically:
+AutoRP uses Discord-hosted asset keys. The seeded profiles use `firefox`, `vscode`, `spotify`, `chrome`, `netflix`, `crunchyroll`, and `youtube_music`; the sample presence uses `autorp_anime`. These are keys only; upload each image to your Discord application's Art Assets before expecting it to appear:
 
 1. Open the [Discord Developer Portal](https://discord.com/developers/applications).
 2. Open the AutoRP application.

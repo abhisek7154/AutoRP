@@ -331,10 +331,11 @@ public sealed class DiscordRpcService(
         }
     }
 
-    private static RichPresence CreatePresence(RpcProfile profile)
+    internal static RichPresence CreatePresence(RpcProfile profile)
     {
         return new RichPresence
         {
+            Name = ActivityNameResolver.Resolve(null, profile),
             Details = profile.Details,
             State = profile.State,
             Assets = CreateAssets(profile),
@@ -370,6 +371,8 @@ public sealed class DiscordRpcService(
         }
 
         return left.ProcessName == right.ProcessName
+            && left.Name == right.Name
+            && left.ActivityName == right.ActivityName
             && left.Details == right.Details
             && left.State == right.State
             && left.LargeImageKey == right.LargeImageKey

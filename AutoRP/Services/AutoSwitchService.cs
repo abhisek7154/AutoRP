@@ -254,26 +254,34 @@ public sealed class AutoSwitchService : IDisposable
             return;
         }
 
+        ActiveApplication? application;
         lock (stateLock)
         {
-            if (isDisposed || version != switchVersion || (!force && hasAppliedProfile && ProfilesEqual(profile, effectiveProfile)))
+            if (isDisposed || version != switchVersion)
             {
                 return;
             }
+
+            application = currentApplication;
         }
+
+        var outgoingProfile = profile with
+        {
+            ActivityName = ActivityNameResolver.Resolve(application, profile)
+        };
 
         await applyGate.WaitAsync();
         try
         {
             lock (stateLock)
             {
-                if (isDisposed || version != switchVersion || (!force && hasAppliedProfile && ProfilesEqual(profile, effectiveProfile)))
+                if (isDisposed || version != switchVersion || (!force && hasAppliedProfile && ProfilesEqual(outgoingProfile, effectiveProfile)))
                 {
                     return;
                 }
             }
 
-            await discordRpcService.SetPresenceAsync(profile);
+            await discordRpcService.SetPresenceAsync(outgoingProfile);
 
             lock (stateLock)
             {
@@ -289,7 +297,7 @@ public sealed class AutoSwitchService : IDisposable
                 return;
             }
 
-            effectiveProfile = profile;
+            effectiveProfile = outgoingProfile;
             hasAppliedProfile = true;
             lastSwitchTime = DateTimeOffset.Now;
             SetStatus($"Discord presence updated: {profile.Details}");

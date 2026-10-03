@@ -19,6 +19,18 @@ public sealed class ProfileManagementTests
         Assert.Equal("chrome", options.Profiles.Single(profile => profile.ProcessName == "chrome.exe").LargeImageKey);
         Assert.Equal("firefox", options.Profiles.Single(profile => profile.ProcessName == "firefox.exe").LargeImageKey);
         Assert.Equal("spotify", options.Profiles.Single(profile => profile.ProcessName == "Spotify.exe").LargeImageKey);
+        Assert.Equal("netflix", options.Profiles.Single(profile => profile.Name == "Netflix").LargeImageKey);
+        Assert.Equal("crunchyroll", options.Profiles.Single(profile => profile.Name == "Crunchyroll").LargeImageKey);
+        Assert.Equal("youtube_music", options.Profiles.Single(profile => profile.Name == "YouTube Music").LargeImageKey);
+    }
+
+    [Fact]
+    public void ProfileEditorPreservesSeededActivityName()
+    {
+        var firefox = new AutoRpOptions().Profiles.Single(profile => profile.Name == "Mozilla Firefox");
+        var edited = new ProfileEditorViewModel(firefox).CreateProfile();
+
+        Assert.Equal("Firefox", edited.ActivityName);
     }
 
     [Fact]

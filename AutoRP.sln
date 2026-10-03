@@ -6,6 +6,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AutoRP", "AutoRP\AutoRP.csp
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AutoRP.Tests", "AutoRP\Tests\AutoRP.Tests.csproj", "{B4F5CE06-7B1C-5F2C-AD1D-5E01D8C2D9E5}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DiscordRPC", "AutoRP\Dependencies\DiscordRPC\DiscordRPC.csproj", "{C5A6E117-8C2D-4B07-97F7-6E7A6D293A10}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -20,5 +22,9 @@ Global
 		{B4F5CE06-7B1C-5F2C-AD1D-5E01D8C2D9E5}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B4F5CE06-7B1C-5F2C-AD1D-5E01D8C2D9E5}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B4F5CE06-7B1C-5F2C-AD1D-5E01D8C2D9E5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C5A6E117-8C2D-4B07-97F7-6E7A6D293A10}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C5A6E117-8C2D-4B07-97F7-6E7A6D293A10}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C5A6E117-8C2D-4B07-97F7-6E7A6D293A10}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C5A6E117-8C2D-4B07-97F7-6E7A6D293A10}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
