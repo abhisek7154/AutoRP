@@ -19,6 +19,7 @@ public sealed class DiscordRpcService(
     private RpcProfile? lastProfile;
     private bool isConnected;
     private bool isDisposed;
+    private long reconnectGeneration;
 
     public event EventHandler<DiscordConnectionStatusChangedEventArgs>? ConnectionStatusChanged;
 
@@ -111,6 +112,7 @@ public sealed class DiscordRpcService(
 
     public async Task DisconnectAsync(CancellationToken cancellationToken = default)
     {
+        Interlocked.Increment(ref reconnectGeneration);
         await connectionGate.WaitAsync(cancellationToken);
         try
         {
@@ -179,23 +181,46 @@ public sealed class DiscordRpcService(
 
     private void ScheduleReconnect()
     {
-        reconnectTimer ??= new Timer(
-            static state => ((DiscordRpcService)state!).ReconnectFromTimer(),
-            this,
+        if (reconnectTimer is not null)
+        {
+            return;
+        }
+
+        var generation = Interlocked.Increment(ref reconnectGeneration);
+        reconnectTimer = new Timer(
+            static state =>
+            {
+                var (service, timerGeneration) = ((DiscordRpcService Service, long Generation))state!;
+                _ = service.ReconnectFromTimerAsync(timerGeneration);
+            },
+            (this, generation),
             ReconnectInterval,
             ReconnectInterval);
     }
 
-    private void ReconnectFromTimer()
+    private async Task ReconnectFromTimerAsync(long generation)
     {
-        if (isDisposed)
+        if (isDisposed || generation != Volatile.Read(ref reconnectGeneration))
         {
             return;
         }
 
         try
         {
-            ConnectAsync().GetAwaiter().GetResult();
+            await connectionGate.WaitAsync();
+            try
+            {
+                if (isDisposed || generation != Volatile.Read(ref reconnectGeneration))
+                {
+                    return;
+                }
+
+                TryConnect();
+            }
+            finally
+            {
+                connectionGate.Release();
+            }
         }
         catch (Exception exception)
         {

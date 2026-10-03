@@ -11,6 +11,8 @@ public sealed class AutoSwitchService : IDisposable
     private readonly ILogger<AutoSwitchService> logger;
     private readonly object stateLock = new();
     private readonly SemaphoreSlim applyGate = new(1, 1);
+    private readonly object taskLock = new();
+    private readonly HashSet<Task> backgroundTasks = [];
     private RpcProfile? effectiveProfile;
     private bool hasAppliedProfile;
     private long switchVersion;
@@ -20,6 +22,7 @@ public sealed class AutoSwitchService : IDisposable
     private DateTimeOffset? lastSwitchTime;
     private string statusMessage = "Automatic switching is ready.";
     private bool isStarted;
+    private bool isStopping;
     private bool isEnabled = true;
 
     public AutoSwitchService(
@@ -74,6 +77,7 @@ public sealed class AutoSwitchService : IDisposable
             }
 
             isStarted = true;
+            isStopping = false;
         }
 
         activeWindowService.ApplicationChanged += OnApplicationChanged;
@@ -91,6 +95,7 @@ public sealed class AutoSwitchService : IDisposable
             }
 
             isStarted = false;
+            isStopping = true;
             switchVersion++;
             hasAppliedProfile = false;
             effectiveProfile = null;
@@ -98,6 +103,26 @@ public sealed class AutoSwitchService : IDisposable
 
         activeWindowService.ApplicationChanged -= OnApplicationChanged;
         activeWindowService.Stop();
+    }
+
+    public async Task StopAsync()
+    {
+        Stop();
+        while (true)
+        {
+            Task[] pending;
+            lock (taskLock)
+            {
+                pending = backgroundTasks.ToArray();
+            }
+
+            if (pending.Length == 0)
+            {
+                return;
+            }
+
+            await Task.WhenAll(pending);
+        }
     }
 
     public void SetEnabled(bool enabled)
@@ -117,7 +142,7 @@ public sealed class AutoSwitchService : IDisposable
 
         if (enabled)
         {
-            _ = ApplyProfileAsync(MatchedProfile, version, force: true);
+            QueueApplyProfile(MatchedProfile, version, force: true);
         }
     }
 
@@ -127,6 +152,11 @@ public sealed class AutoSwitchService : IDisposable
         long version;
         lock (stateLock)
         {
+            if (isStopping || isDisposed)
+            {
+                return;
+            }
+
             currentApplication = application;
             matchedProfile = profile;
             version = ++switchVersion;
@@ -149,7 +179,7 @@ public sealed class AutoSwitchService : IDisposable
 
         logger.LogInformation("Foreground application changed: {ProcessName}. Matched profile: {Details}.", application?.ExecutableName, profile.Details);
         SetStatus($"Matched profile: {profile.Details}");
-        _ = ApplyProfileAsync(profile, version);
+        QueueApplyProfile(profile, version);
     }
 
     public void Dispose()
@@ -167,7 +197,7 @@ public sealed class AutoSwitchService : IDisposable
 
         discordRpcService.ConnectionStatusChanged -= OnConnectionStatusChanged;
         profileManager.ProfilesChanged -= OnProfilesChanged;
-        Stop();
+        StopAsync().GetAwaiter().GetResult();
         applyGate.Wait();
         applyGate.Release();
         applyGate.Dispose();
@@ -200,7 +230,7 @@ public sealed class AutoSwitchService : IDisposable
                 profile = matchedProfile ?? effectiveProfile;
             }
 
-            _ = ApplyProfileAsync(profile, version, force: true);
+            QueueApplyProfile(profile, version, force: true);
         }
 
         PublishState();
@@ -273,6 +303,42 @@ public sealed class AutoSwitchService : IDisposable
         {
             applyGate.Release();
         }
+    }
+
+    private void QueueApplyProfile(RpcProfile? profile, long version, bool force = false)
+    {
+        if (profile is null)
+        {
+            return;
+        }
+
+        Task task;
+        lock (taskLock)
+        {
+            lock (stateLock)
+            {
+                if (isStopping || isDisposed || version != switchVersion)
+                {
+                    return;
+                }
+            }
+
+            task = ApplyProfileAsync(profile, version, force);
+            backgroundTasks.Add(task);
+        }
+
+        _ = task.ContinueWith(
+            completed =>
+            {
+                _ = completed.Exception;
+                lock (taskLock)
+                {
+                    backgroundTasks.Remove(completed);
+                }
+            },
+            CancellationToken.None,
+            TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
     }
 
     private void SetStatus(string message)

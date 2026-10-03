@@ -13,6 +13,8 @@ public sealed class PresenceCoordinator : IDisposable
     private readonly ILogger<PresenceCoordinator> logger;
     private int isDisposed;
     private int stopStarted;
+    private readonly object backgroundLock = new();
+    private readonly HashSet<Task> backgroundTasks = [];
 
     public event EventHandler<AutoSwitchStateChangedEventArgs>? AutomaticSwitchingStateChanged;
 
@@ -48,7 +50,24 @@ public sealed class PresenceCoordinator : IDisposable
             return;
         }
 
-        autoSwitchService.Stop();
+        autoSwitchService.StateChanged -= OnAutomaticSwitchingStateChanged;
+        settingsService.SettingsChanged -= OnSettingsChanged;
+        await autoSwitchService.StopAsync();
+        while (true)
+        {
+            Task[] pending;
+            lock (backgroundLock)
+            {
+                pending = backgroundTasks.ToArray();
+            }
+
+            if (pending.Length == 0)
+            {
+                break;
+            }
+
+            await Task.WhenAll(pending);
+        }
         if (discordRpcService.IsConnected)
         {
             await discordRpcService.ClearPresenceAsync(cancellationToken);
@@ -132,7 +151,26 @@ public sealed class PresenceCoordinator : IDisposable
 
     private void OnSettingsChanged(object? sender, EventArgs e)
     {
-        _ = ReinitializeDiscordAsync();
+        Task task;
+        lock (backgroundLock)
+        {
+            if (Volatile.Read(ref stopStarted) != 0 || Volatile.Read(ref isDisposed) != 0)
+            {
+                return;
+            }
+
+            task = ReinitializeDiscordAsync();
+            backgroundTasks.Add(task);
+        }
+
+        _ = task.ContinueWith(completed =>
+        {
+            _ = completed.Exception;
+            lock (backgroundLock)
+            {
+                backgroundTasks.Remove(completed);
+            }
+        }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
     }
 
     private async Task ReinitializeDiscordAsync()

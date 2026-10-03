@@ -1,8 +1,35 @@
-# AutoRP
-
 <img width="1312" height="1199" alt="Untitled1111" src="https://github.com/user-attachments/assets/4abd127e-8dda-41b3-b466-e83606e9e850" />
 
-AutoRP is a Windows WPF desktop application that publishes Discord Rich Presence based on the active Windows application. Profiles can match executable names, multiple processes, and window-title fragments, with priority-based selection and live editing.
+# AutoRP
+
+AutoRP automatically changes your Discord Rich Presence based on the Windows application you're using.
+
+## Quick Start
+
+1. Download and run AutoRP.
+2. Start Discord.
+3. Open **Settings** in AutoRP.
+4. Enter your Discord Application ID and click **Save**.
+5. Choose a profile for the app you use, or click **Add Profile** to create one.
+6. Upload the matching Discord Rich Presence Art Asset if you want custom artwork.
+7. Turn on **Automatic Switching**.
+8. Switch to Firefox, VS Code, Spotify, or another profiled app. AutoRP updates your Discord presence automatically.
+
+`Open AutoRP → Configure Discord → Create Profile → Enable Automatic Switching → Switch apps → Discord updates`
+
+## First Time Using AutoRP?
+
+- You do **not** need to edit JSON by hand.
+- Built-in profiles cover common apps, so you do not need to look up executable names for those apps.
+- AutoRP shows the current application; use it as a guide when creating a profile for an app.
+- The advanced profile editor is there when you need process, window-title, or priority matching.
+- Settings and profiles are stored locally on your computer.
+
+For example:
+
+`Firefox → Browsing with Firefox → Firefox artwork`
+
+`VS Code → Coding → VS Code artwork`
 
 ## Features
 

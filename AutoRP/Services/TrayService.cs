@@ -2,6 +2,7 @@ using Hardcodet.Wpf.TaskbarNotification;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media.Imaging;
+using System.Windows.Threading;
 
 namespace AutoRP.Services;
 
@@ -177,9 +178,27 @@ public sealed class TrayService : ITrayService
 
     private void OnExitClick(object sender, RoutedEventArgs e)
     {
+        RequestExit();
+    }
+
+    internal void RequestExit()
+    {
+        if (IsExitRequested)
+        {
+            return;
+        }
+
         CloseContextMenu();
         IsExitRequested = true;
-        ExitRequested?.Invoke(this, EventArgs.Empty);
+        // Let WPF finish the routed click and close the native popup before teardown.
+        var dispatcher = Application.Current?.Dispatcher;
+        if (dispatcher is null || dispatcher.HasShutdownStarted)
+        {
+            ExitRequested?.Invoke(this, EventArgs.Empty);
+            return;
+        }
+
+        dispatcher.BeginInvoke(DispatcherPriority.ContextIdle, new Action(() => ExitRequested?.Invoke(this, EventArgs.Empty)));
     }
 
     private void OnOpenClick(object sender, RoutedEventArgs e)

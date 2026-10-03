@@ -73,19 +73,27 @@ public partial class MainWindow : Window
 
         if (!trayService.IsExitRequested && !settingsViewModel.CloseToTray)
         {
-            Application.Current.Shutdown();
+            if (Application.Current is App app)
+            {
+                _ = app.ShutdownApplicationAsync();
+            }
         }
     }
 
     private void OnClosing(object? sender, System.ComponentModel.CancelEventArgs e)
     {
-        if (trayService.IsExitRequested || !settingsViewModel.CloseToTray)
+        if (!ShouldHideToTray(settingsViewModel.CloseToTray, trayService.IsExitRequested))
         {
             return;
         }
 
         e.Cancel = true;
         Hide();
+    }
+
+    internal static bool ShouldHideToTray(bool closeToTray, bool exitRequested)
+    {
+        return closeToTray && !exitRequested;
     }
 
     private async void OnSetSamplePresenceClick(object sender, RoutedEventArgs e)

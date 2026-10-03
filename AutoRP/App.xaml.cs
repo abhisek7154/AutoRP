@@ -12,6 +12,8 @@ public partial class App : Application
 {
     private ServiceProvider? serviceProvider;
     private int shutdownStarted;
+    private readonly object shutdownLock = new();
+    private Task? shutdownTask;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -31,11 +33,6 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
-        if (Interlocked.Exchange(ref shutdownStarted, 1) == 0)
-        {
-            ShutdownServicesAsync().GetAwaiter().GetResult();
-        }
-
         base.OnExit(e);
     }
 
@@ -70,13 +67,28 @@ public partial class App : Application
         MainWindow.Activate();
     }
 
-    private async void OnTrayExitRequested(object? sender, EventArgs e)
+    private void OnTrayExitRequested(object? sender, EventArgs e)
     {
-        if (Interlocked.Exchange(ref shutdownStarted, 1) != 0)
-        {
-            return;
-        }
+        _ = ShutdownApplicationAsync();
+    }
 
+    public Task ShutdownApplicationAsync()
+    {
+        lock (shutdownLock)
+        {
+            if (shutdownTask is not null)
+            {
+                return shutdownTask;
+            }
+
+            Interlocked.Exchange(ref shutdownStarted, 1);
+            shutdownTask = ShutdownCoreAsync();
+            return shutdownTask;
+        }
+    }
+
+    private async Task ShutdownCoreAsync()
+    {
         try
         {
             await ShutdownServicesAsync();
@@ -95,26 +107,7 @@ public partial class App : Application
             return;
         }
 
-        var window = MainWindow;
-        if (window is not null)
-        {
-            foreach (var ownedWindow in window.OwnedWindows.OfType<Window>().ToArray())
-            {
-                ownedWindow.Close();
-            }
-
-            window.Close();
-        }
-
         try
-        {
-            var coordinator = provider.GetService<PresenceCoordinator>();
-            if (coordinator is not null)
-            {
-                await coordinator.StopAsync();
-            }
-        }
-        finally
         {
             var trayService = provider.GetService<ITrayService>();
             if (trayService is not null)
@@ -124,8 +117,41 @@ public partial class App : Application
                 trayService.Dispose();
             }
 
-            provider.Dispose();
-            serviceProvider = null;
+        }
+        finally
+        {
+            try
+            {
+                var window = MainWindow;
+                if (window is not null)
+                {
+                    foreach (var ownedWindow in window.OwnedWindows.OfType<Window>().ToArray())
+                    {
+                        ownedWindow.Close();
+                    }
+
+                    if (window.IsLoaded)
+                    {
+                        window.Close();
+                    }
+                }
+            }
+            finally
+            {
+                try
+                {
+                    var coordinator = provider.GetService<PresenceCoordinator>();
+                    if (coordinator is not null)
+                    {
+                        await coordinator.StopAsync();
+                    }
+                }
+                finally
+                {
+                    provider.Dispose();
+                    serviceProvider = null;
+                }
+            }
         }
     }
 }

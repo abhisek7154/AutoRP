@@ -50,6 +50,81 @@ public sealed class ShutdownTests
     }
 
     [Fact]
+    public void CloseToTrayOnlyHidesForAnOrdinaryClose()
+    {
+        Assert.True(UI.MainWindow.ShouldHideToTray(closeToTray: true, exitRequested: false));
+        Assert.False(UI.MainWindow.ShouldHideToTray(closeToTray: false, exitRequested: false));
+        Assert.False(UI.MainWindow.ShouldHideToTray(closeToTray: true, exitRequested: true));
+    }
+
+    [Fact]
+    public async Task ShutdownWaitsForPresenceWorkAndPreventsFurtherMonitoringUpdates()
+    {
+        using var loggerFactory = LoggerFactory.Create(builder => { });
+        var activeWindow = new FakeActiveWindowService();
+        var discord = new FakeDiscordRpcService { BlockPresenceUpdates = true };
+        using var autoSwitch = new AutoSwitchService(
+            activeWindow,
+            new InMemoryProfileManager([new RpcProfile("firefox", "Browsing", "Firefox")]),
+            discord,
+            loggerFactory.CreateLogger<AutoSwitchService>());
+        var path = Path.Combine(Path.GetTempPath(), $"autorp-shutdown-{Guid.NewGuid():N}.json");
+        var settings = new JsonSettingsService(loggerFactory.CreateLogger<JsonSettingsService>(), path);
+        var coordinator = new PresenceCoordinator(
+            discord,
+            autoSwitch,
+            settings,
+            new Configuration.AutoRpOptions { DiscordApplicationId = string.Empty },
+            loggerFactory.CreateLogger<PresenceCoordinator>());
+
+        await coordinator.StartAsync();
+        activeWindow.Raise(new ActiveApplication(42, "firefox", "firefox.exe", "Firefox"));
+        await discord.PresenceUpdateStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        var stopping = coordinator.StopAsync();
+        Assert.False(stopping.IsCompleted);
+        discord.ReleasePresenceUpdate.TrySetResult();
+        await stopping;
+        activeWindow.Raise(new ActiveApplication(43, "code", "code.exe", "VS Code"));
+
+        Assert.Equal(1, activeWindow.StopCalls);
+        Assert.Single(discord.SetCalls);
+        Assert.Equal(1, discord.DisconnectCalls);
+        coordinator.Dispose();
+        if (File.Exists(path)) File.Delete(path);
+    }
+
+    [Fact]
+    public async Task ShutdownStillCompletesWhenDiscordIsAlreadyDisconnected()
+    {
+        using var loggerFactory = LoggerFactory.Create(builder => { });
+        var activeWindow = new FakeActiveWindowService();
+        var discord = new FakeDiscordRpcService();
+        using var autoSwitch = new AutoSwitchService(
+            activeWindow,
+            new InMemoryProfileManager(),
+            discord,
+            loggerFactory.CreateLogger<AutoSwitchService>());
+        var settings = new JsonSettingsService(
+            loggerFactory.CreateLogger<JsonSettingsService>(),
+            Path.Combine(Path.GetTempPath(), $"autorp-disconnected-{Guid.NewGuid():N}.json"));
+        var coordinator = new PresenceCoordinator(
+            discord,
+            autoSwitch,
+            settings,
+            new Configuration.AutoRpOptions { DiscordApplicationId = string.Empty },
+            loggerFactory.CreateLogger<PresenceCoordinator>());
+
+        await coordinator.StartAsync();
+        discord.MarkDisconnected();
+        await coordinator.StopAsync();
+
+        Assert.Equal(1, activeWindow.StopCalls);
+        Assert.Equal(1, discord.DisconnectCalls);
+        coordinator.Dispose();
+    }
+
+    [Fact]
     public void TrayDisposalIsSafeToRepeat()
     {
         using var loggerFactory = LoggerFactory.Create(builder => { });
@@ -66,6 +141,27 @@ public sealed class ShutdownTests
         tray.Dispose();
 
         Assert.False(tray.IsExitRequested);
+    }
+
+    [Fact]
+    public void TrayExitRaisesOneShutdownRequestAndMarksExplicitExit()
+    {
+        using var loggerFactory = LoggerFactory.Create(builder => { });
+        var discord = new FakeDiscordRpcService();
+        using var autoSwitch = new AutoSwitchService(
+            new FakeActiveWindowService(),
+            new InMemoryProfileManager(),
+            discord,
+            loggerFactory.CreateLogger<AutoSwitchService>());
+        using var tray = new TrayService(autoSwitch, discord);
+        var exitRequests = 0;
+        tray.ExitRequested += (_, _) => exitRequests++;
+
+        tray.RequestExit();
+        tray.RequestExit();
+
+        Assert.True(tray.IsExitRequested);
+        Assert.Equal(1, exitRequests);
     }
 
     private sealed class FakeActiveWindowService : IActiveWindowService
@@ -85,15 +181,15 @@ public sealed class ShutdownTests
         }
     }
 
-    private sealed class InMemoryProfileManager : IPresenceProfileManager
+    private sealed class InMemoryProfileManager(IReadOnlyList<RpcProfile>? profiles = null) : IPresenceProfileManager
     {
         public event EventHandler? ProfilesChanged
         {
             add { }
             remove { }
         }
-        public IReadOnlyList<RpcProfile> Profiles => [];
-        public RpcProfile? FindProfile(ActiveApplication? application) => null;
+        public IReadOnlyList<RpcProfile> Profiles => profiles ?? [];
+        public RpcProfile? FindProfile(ActiveApplication? application) => application is null ? null : Profiles.FirstOrDefault();
     }
 
     private sealed class FakeDiscordRpcService : IDiscordRpcService
@@ -102,17 +198,25 @@ public sealed class ShutdownTests
         public bool IsConnected { get; private set; } = true;
         public List<RpcProfile> SetCalls { get; } = [];
         public int DisconnectCalls { get; private set; }
+        public bool BlockPresenceUpdates { get; init; }
+        public TaskCompletionSource PresenceUpdateStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource ReleasePresenceUpdate { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public void MarkDisconnected() => IsConnected = false;
 
         public Task ConnectAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task ReinitializeAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
-        public Task SetPresenceAsync(RpcProfile profile, CancellationToken cancellationToken = default)
+        public async Task SetPresenceAsync(RpcProfile profile, CancellationToken cancellationToken = default)
         {
+            PresenceUpdateStarted.TrySetResult();
+            if (BlockPresenceUpdates)
+            {
+                await ReleasePresenceUpdate.Task.WaitAsync(cancellationToken);
+            }
+
             if (IsConnected)
             {
                 SetCalls.Add(profile);
             }
-
-            return Task.CompletedTask;
         }
 
         public Task ClearPresenceAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
