@@ -1,0 +1,47 @@
+<Window x:Class="AutoRP.UI.ProfileEditorWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="RPC Profile"
+        Width="460"
+        Height="620"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="24">
+            <TextBlock Style="{StaticResource PageTitleStyle}" Text="RPC Profile" />
+            <TextBlock Margin="0,6,0,20" Style="{StaticResource SubtitleStyle}" Text="Configure the profile used for an executable." />
+
+            <TextBlock Style="{StaticResource LabelStyle}" Text="PROFILE NAME *" />
+            <TextBox Margin="0,4,0,12" Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" />
+            <TextBlock Style="{StaticResource LabelStyle}" Text="PROCESS NAMES" />
+            <TextBox Margin="0,4,0,4" AcceptsReturn="True" Height="48" TextWrapping="Wrap" ToolTip="Separate names with commas, semicolons, or new lines." Text="{Binding ProcessNamesText, UpdateSourceTrigger=PropertyChanged}" />
+            <TextBlock Margin="0,0,0,12" Style="{StaticResource FooterStyle}" Text="Use one or more executable names, such as Code.exe, chrome.exe, or firefox.exe." TextWrapping="Wrap" />
+            <TextBlock Style="{StaticResource LabelStyle}" Text="WINDOW TITLE CONTAINS" />
+            <TextBox Margin="0,4,0,4" AcceptsReturn="True" Height="48" TextWrapping="Wrap" ToolTip="All entered fragments must occur in the window title." Text="{Binding WindowTitleContainsText, UpdateSourceTrigger=PropertyChanged}" />
+            <TextBlock Margin="0,0,0,12" Style="{StaticResource FooterStyle}" Text="Optional. All fragments must be present; separate values with commas, semicolons, or new lines." TextWrapping="Wrap" />
+            <TextBlock Style="{StaticResource LabelStyle}" Text="PRIORITY" />
+            <TextBox Margin="0,4,0,12" Text="{Binding Priority, UpdateSourceTrigger=PropertyChanged}" />
+            <TextBlock Style="{StaticResource LabelStyle}" Text="DETAILS *" />
+            <TextBox Margin="0,4,0,12" Text="{Binding Details, UpdateSourceTrigger=PropertyChanged}" />
+            <TextBlock Style="{StaticResource LabelStyle}" Text="STATE *" />
+            <TextBox Margin="0,4,0,12" Text="{Binding State, UpdateSourceTrigger=PropertyChanged}" />
+            <TextBlock Style="{StaticResource LabelStyle}" Text="LARGE IMAGE KEY" />
+            <TextBox Margin="0,4,0,12" Text="{Binding LargeImageKey, UpdateSourceTrigger=PropertyChanged}" />
+            <TextBlock Style="{StaticResource LabelStyle}" Text="LARGE IMAGE TEXT" />
+            <TextBox Margin="0,4,0,12" Text="{Binding LargeImageText, UpdateSourceTrigger=PropertyChanged}" />
+            <TextBlock Style="{StaticResource LabelStyle}" Text="SMALL IMAGE KEY" />
+            <TextBox Margin="0,4,0,12" Text="{Binding SmallImageKey, UpdateSourceTrigger=PropertyChanged}" />
+            <TextBlock Style="{StaticResource LabelStyle}" Text="SMALL IMAGE TEXT" />
+            <TextBox Margin="0,4,0,12" Text="{Binding SmallImageText, UpdateSourceTrigger=PropertyChanged}" />
+            <TextBlock Style="{StaticResource LabelStyle}" Text="OPTIONAL BUTTON" />
+            <TextBox Margin="0,4,0,6" ToolTip="Button label" Text="{Binding ButtonLabel, UpdateSourceTrigger=PropertyChanged}" />
+            <TextBox Margin="0,0,0,12" ToolTip="Button URL" Text="{Binding ButtonUrl, UpdateSourceTrigger=PropertyChanged}" />
+            <CheckBox Margin="0,0,0,20" Content="Enabled for automatic switching" IsChecked="{Binding IsEnabled}" />
+
+            <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
+                <Button Width="90" Margin="0,0,8,0" Click="OnCancelClick" Content="Cancel" />
+                <Button Width="90" Click="OnSaveClick" Content="Save" IsDefault="True" />
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
+</Window>
