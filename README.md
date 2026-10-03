@@ -58,6 +58,20 @@ Discord RPC Service
 
 `AutoRpOptions.DiscordApplicationId` reads this environment variable at startup. Never commit an Application ID, token, secret, or machine-specific configuration. A missing Application ID is supported; AutoRP remains open and retries without publishing presence.
 
+## Discord Artwork
+
+AutoRP uses the Discord-hosted large asset key `autorp_anime` for the seeded profiles and sample presence. To enable the artwork:
+
+1. Open the [Discord Developer Portal](https://discord.com/developers/applications).
+2. Open the AutoRP application.
+3. Go to **Rich Presence** / **Art Assets**.
+4. Upload the generated anime artwork.
+5. Set the asset name/key to exactly `autorp_anime`.
+6. Configure `AUTORP_DISCORD_APPLICATION_ID` as described above.
+7. Start AutoRP and verify the artwork appears in Discord Rich Presence.
+
+The asset key must exactly match the name uploaded in the Developer Portal. Existing or edited profiles can still provide their own `LargeImageKey`; `SmallImageKey` and its text remain supported. The image file itself is not required in this repository because Discord serves the uploaded asset.
+
 ## Running From Source
 
 ```powershell

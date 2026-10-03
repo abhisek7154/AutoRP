@@ -10,6 +10,15 @@ namespace AutoRP.Tests;
 public sealed class ProfileManagementTests
 {
     [Fact]
+    public void SeededProfilesUseTheDiscordAnimeAssetKey()
+    {
+        var options = new AutoRpOptions();
+
+        Assert.NotEmpty(options.Profiles);
+        Assert.All(options.Profiles, profile => Assert.Equal("autorp_anime", profile.LargeImageKey));
+    }
+
+    [Fact]
     public void AddsEditsDeletesAndPersistsProfile()
     {
         using var context = TestContext.Create();
@@ -69,11 +78,12 @@ public sealed class ProfileManagementTests
         await viewModel.TestSelectedProfileAsync();
 
         Assert.Equal(profile.Name, discord.LastProfile?.Name);
+        Assert.Equal("autorp_anime", discord.LastProfile?.LargeImageKey);
     }
 
     private static RpcProfile Profile(string name, string processName, string details)
     {
-        return new RpcProfile(processName, details, "Testing") { Name = name };
+        return new RpcProfile(processName, details, "Testing", LargeImageKey: "autorp_anime") { Name = name };
     }
 
     private sealed class TestContext : IDisposable

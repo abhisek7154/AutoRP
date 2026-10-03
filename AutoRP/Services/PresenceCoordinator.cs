@@ -68,7 +68,7 @@ public sealed class PresenceCoordinator
             ProcessName: "AutoRP",
             Details: "Building AutoRP",
             State: "Testing Discord Rich Presence",
-            LargeImageKey: "autorp_large",
+            LargeImageKey: "autorp_anime",
             LargeImageText: "AutoRP",
             Buttons: new[]
             {
