@@ -240,18 +240,23 @@ public sealed class DiscordRpcService(
         {
             Details = profile.Details,
             State = profile.State,
-            Assets = new Assets
-            {
-                LargeImageKey = profile.LargeImageKey,
-                LargeImageText = profile.LargeImageText,
-                SmallImageKey = profile.SmallImageKey,
-                SmallImageText = profile.SmallImageText
-            },
+            Assets = CreateAssets(profile),
             Buttons = profile.Buttons?.Select(button => new Button
             {
                 Label = button.Label,
                 Url = button.Url
             }).ToArray()
+        };
+    }
+
+    internal static Assets CreateAssets(RpcProfile profile)
+    {
+        return new Assets
+        {
+            LargeImageKey = profile.LargeImageKey,
+            LargeImageText = profile.LargeImageText,
+            SmallImageKey = profile.SmallImageKey,
+            SmallImageText = profile.SmallImageText
         };
     }
 

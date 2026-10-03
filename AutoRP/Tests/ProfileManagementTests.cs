@@ -105,6 +105,31 @@ public sealed class ProfileManagementTests
         Assert.Equal("autorp_anime", discord.LastProfile?.SmallImageKey);
     }
 
+    [Fact]
+    public void DiscordPayloadUsesProfileArtworkKeysWithoutSuppressingTextForMissingAssets()
+    {
+        var profile = new RpcProfile(
+            "missing.exe",
+            "Text remains visible",
+            "Even when artwork is unavailable",
+            LargeImageKey: "asset-that-is-not-uploaded");
+
+        var assets = DiscordRpcService.CreateAssets(profile);
+
+        Assert.Equal("asset-that-is-not-uploaded", assets.LargeImageKey);
+        Assert.Equal("Text remains visible", profile.Details);
+        Assert.Equal("Even when artwork is unavailable", profile.State);
+    }
+
+    [Fact]
+    public void AutoRpSamplePresenceUsesItsDiscordArtworkKey()
+    {
+        var profile = PresenceCoordinator.CreateSampleProfile();
+
+        Assert.Equal("autorp_anime", profile.LargeImageKey);
+        Assert.Equal("autorp_anime", DiscordRpcService.CreateAssets(profile).LargeImageKey);
+    }
+
     private static RpcProfile Profile(string name, string processName, string details)
     {
         return new RpcProfile(processName, details, "Testing", LargeImageKey: "autorp_anime") { Name = name };

@@ -83,16 +83,7 @@ public sealed class PresenceCoordinator : IDisposable
 
     public Task SetSamplePresenceAsync(CancellationToken cancellationToken = default)
     {
-        return discordRpcService.SetPresenceAsync(new RpcProfile(
-            ProcessName: "AutoRP",
-            Details: "Building AutoRP",
-            State: "Testing Discord Rich Presence",
-            LargeImageKey: "autorp_anime",
-            LargeImageText: "AutoRP",
-            Buttons: new[]
-            {
-                new RpcButton("AutoRP project", "https://github.com/")
-            }), cancellationToken);
+        return discordRpcService.SetPresenceAsync(CreateSampleProfile(), cancellationToken);
     }
 
     public Task ClearPresenceAsync(CancellationToken cancellationToken = default)
@@ -106,6 +97,20 @@ public sealed class PresenceCoordinator : IDisposable
         return application is null
             ? "No active application detected"
             : $"{application.ProcessName} - {application.WindowTitle}";
+    }
+
+    internal static RpcProfile CreateSampleProfile()
+    {
+        return new RpcProfile(
+            ProcessName: "AutoRP",
+            Details: "Building AutoRP",
+            State: "Testing Discord Rich Presence",
+            LargeImageKey: "autorp_anime",
+            LargeImageText: "AutoRP",
+            Buttons: new[]
+            {
+                new RpcButton("AutoRP project", "https://github.com/")
+            });
     }
 
     private void OnAutomaticSwitchingStateChanged(object? sender, AutoSwitchStateChangedEventArgs e)

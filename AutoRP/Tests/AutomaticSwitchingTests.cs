@@ -26,6 +26,16 @@ public sealed class AutomaticSwitchingTests
         Assert.Equal("vscode", manager.FindProfile(Application("Code.exe"))?.LargeImageKey);
     }
 
+    [Theory]
+    [InlineData("firefox.exe", "firefox")]
+    [InlineData("chrome.exe", "chrome")]
+    [InlineData("Spotify.exe", "spotify")]
+    [InlineData("Code.exe", "vscode")]
+    public void FindsTheExpectedArtworkKeyForEachSeededApplication(string executableName, string expectedKey)
+    {
+        Assert.Equal(expectedKey, CreateManager().FindProfile(Application(executableName))?.LargeImageKey);
+    }
+
     [Fact]
     public async Task ChangingSettingsReinitializesDiscordRpc()
     {
@@ -181,7 +191,8 @@ public sealed class AutomaticSwitchingTests
             [
                 new RpcProfile("chrome.exe", "Chrome", "Browsing", LargeImageKey: "chrome"),
                 new RpcProfile("Code.exe", "Code", "Coding", LargeImageKey: "vscode"),
-                new RpcProfile("firefox.exe", "Firefox", "Browsing", LargeImageKey: "firefox")
+                new RpcProfile("firefox.exe", "Firefox", "Browsing", LargeImageKey: "firefox"),
+                new RpcProfile("Spotify.exe", "Spotify", "Listening", LargeImageKey: "spotify")
             ]
         });
     }

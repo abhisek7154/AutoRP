@@ -12,6 +12,7 @@
   <ItemGroup>
     <Compile Remove="Tests\**" />
     <Resource Include="Resources\AutoRP.ico" />
+    <InternalsVisibleTo Include="AutoRP.Tests" />
     <PackageReference Include="DiscordRichPresence" Version="1.6.1.70" />
     <PackageReference Include="Hardcodet.NotifyIcon.Wpf" Version="1.1.0" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.1" />

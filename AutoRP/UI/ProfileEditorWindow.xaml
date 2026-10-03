@@ -25,15 +25,16 @@
             <TextBox Margin="0,4,0,12" Text="{Binding Details, UpdateSourceTrigger=PropertyChanged}" />
             <TextBlock Style="{StaticResource LabelStyle}" Text="STATE *" />
             <TextBox Margin="0,4,0,12" Text="{Binding State, UpdateSourceTrigger=PropertyChanged}" />
-            <TextBlock Style="{StaticResource LabelStyle}" Text="LARGE IMAGE ASSET KEY" />
-            <TextBox Margin="0,4,0,12" Text="{Binding LargeImageKey, UpdateSourceTrigger=PropertyChanged}" />
+            <TextBlock Style="{StaticResource LabelStyle}" Text="LARGE IMAGE ASSET KEY (DISCORD)" />
+            <TextBox Margin="0,4,0,4" ToolTip="Discord Developer Portal Rich Presence Art Asset name; not a local file path." Text="{Binding LargeImageKey, UpdateSourceTrigger=PropertyChanged}" />
             <TextBlock Style="{StaticResource LabelStyle}" Text="LARGE IMAGE TEXT" />
             <TextBox Margin="0,4,0,12" Text="{Binding LargeImageText, UpdateSourceTrigger=PropertyChanged}" />
-            <TextBlock Margin="0,0,0,12" Style="{StaticResource FooterStyle}" Text="The asset key must exactly match an image uploaded to your Discord Developer Application under Rich Presence → Art Assets." TextWrapping="Wrap" />
-            <TextBlock Style="{StaticResource LabelStyle}" Text="SMALL IMAGE ASSET KEY" />
-            <TextBox Margin="0,4,0,12" Text="{Binding SmallImageKey, UpdateSourceTrigger=PropertyChanged}" />
+            <TextBlock Margin="0,0,0,12" Style="{StaticResource FooterStyle}" Text="Enter the exact asset name uploaded to your Discord Developer Portal application under Rich Presence → Art Assets. AutoRP sends this key to Discord; it does not load a local image file." TextWrapping="Wrap" />
+            <TextBlock Style="{StaticResource LabelStyle}" Text="SMALL IMAGE ASSET KEY (DISCORD)" />
+            <TextBox Margin="0,4,0,4" ToolTip="Discord Developer Portal Rich Presence Art Asset name; not a local file path." Text="{Binding SmallImageKey, UpdateSourceTrigger=PropertyChanged}" />
             <TextBlock Style="{StaticResource LabelStyle}" Text="SMALL IMAGE TEXT" />
             <TextBox Margin="0,4,0,12" Text="{Binding SmallImageText, UpdateSourceTrigger=PropertyChanged}" />
+            <TextBlock Margin="0,0,0,12" Style="{StaticResource FooterStyle}" Text="The small-image key must also exactly match the corresponding Discord Developer Portal Rich Presence Art Asset." TextWrapping="Wrap" />
             <TextBlock Style="{StaticResource LabelStyle}" Text="OPTIONAL BUTTON" />
             <TextBox Margin="0,4,0,6" ToolTip="Button label" Text="{Binding ButtonLabel, UpdateSourceTrigger=PropertyChanged}" />
             <TextBox Margin="0,0,0,12" ToolTip="Button URL" Text="{Binding ButtonUrl, UpdateSourceTrigger=PropertyChanged}" />
