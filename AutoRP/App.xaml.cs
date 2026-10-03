@@ -103,10 +103,7 @@ public partial class App : Application
                 ownedWindow.Close();
             }
 
-            if (window.IsVisible)
-            {
-                window.Close();
-            }
+            window.Close();
         }
 
         try

@@ -49,6 +49,25 @@ public sealed class ShutdownTests
         }
     }
 
+    [Fact]
+    public void TrayDisposalIsSafeToRepeat()
+    {
+        using var loggerFactory = LoggerFactory.Create(builder => { });
+        var activeWindow = new FakeActiveWindowService();
+        var discord = new FakeDiscordRpcService();
+        using var autoSwitch = new AutoSwitchService(
+            activeWindow,
+            new InMemoryProfileManager(),
+            discord,
+            loggerFactory.CreateLogger<AutoSwitchService>());
+        using var tray = new TrayService(autoSwitch, discord);
+
+        tray.Dispose();
+        tray.Dispose();
+
+        Assert.False(tray.IsExitRequested);
+    }
+
     private sealed class FakeActiveWindowService : IActiveWindowService
     {
         public event EventHandler<ActiveApplicationChangedEventArgs>? ApplicationChanged;

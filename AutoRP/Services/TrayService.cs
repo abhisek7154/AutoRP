@@ -10,12 +10,16 @@ public sealed class TrayService : ITrayService
     private readonly AutoSwitchService autoSwitchService;
     private readonly IDiscordRpcService discordRpcService;
     private TaskbarIcon? taskbarIcon;
+    private ContextMenu? contextMenu;
+    private MenuItem? openItem;
     private MenuItem? pauseItem;
     private MenuItem? resumeItem;
     private MenuItem? statusItem;
     private MenuItem? applicationItem;
     private MenuItem? profileItem;
     private MenuItem? discordItem;
+    private MenuItem? clearItem;
+    private MenuItem? exitItem;
     private bool isDisposed;
 
     public TrayService(AutoSwitchService autoSwitchService, IDiscordRpcService discordRpcService)
@@ -38,43 +42,39 @@ public sealed class TrayService : ITrayService
         }
 
         pauseItem = new MenuItem { Header = "Pause Automatic Switching" };
-        pauseItem.Click += (_, _) => autoSwitchService.SetEnabled(false);
+        pauseItem.Click += OnPauseClick;
         resumeItem = new MenuItem { Header = "Resume Automatic Switching" };
-        resumeItem.Click += (_, _) => autoSwitchService.SetEnabled(true);
+        resumeItem.Click += OnResumeClick;
         statusItem = new MenuItem { Header = "AutoRP - Running", IsEnabled = false };
         applicationItem = new MenuItem { Header = "Application: detecting...", IsEnabled = false };
         profileItem = new MenuItem { Header = "Profile: none", IsEnabled = false };
         discordItem = new MenuItem { Header = "Discord: Disconnected", IsEnabled = false };
 
-        var menu = new ContextMenu();
-        var openItem = new MenuItem { Header = "Open AutoRP" };
-        openItem.Click += (_, _) => OpenRequested?.Invoke(this, EventArgs.Empty);
-        var clearItem = new MenuItem { Header = "Clear Discord Presence" };
-        clearItem.Click += async (_, _) =>
-        {
-            autoSwitchService.MarkPresenceCleared();
-            await discordRpcService.ClearPresenceAsync();
-        };
-        var exitItem = new MenuItem { Header = "Exit" };
+        contextMenu = new ContextMenu { StaysOpen = false };
+        openItem = new MenuItem { Header = "Open AutoRP" };
+        openItem.Click += OnOpenClick;
+        clearItem = new MenuItem { Header = "Clear Discord Presence" };
+        clearItem.Click += OnClearPresenceClick;
+        exitItem = new MenuItem { Header = "Exit" };
         exitItem.Click += OnExitClick;
-        menu.Items.Add(openItem);
-        menu.Items.Add(new Separator());
-        menu.Items.Add(pauseItem);
-        menu.Items.Add(resumeItem);
-        menu.Items.Add(clearItem);
-        menu.Items.Add(new Separator());
-        menu.Items.Add(statusItem);
-        menu.Items.Add(applicationItem);
-        menu.Items.Add(profileItem);
-        menu.Items.Add(discordItem);
-        menu.Items.Add(new Separator());
-        menu.Items.Add(exitItem);
+        contextMenu.Items.Add(openItem);
+        contextMenu.Items.Add(new Separator());
+        contextMenu.Items.Add(pauseItem);
+        contextMenu.Items.Add(resumeItem);
+        contextMenu.Items.Add(clearItem);
+        contextMenu.Items.Add(new Separator());
+        contextMenu.Items.Add(statusItem);
+        contextMenu.Items.Add(applicationItem);
+        contextMenu.Items.Add(profileItem);
+        contextMenu.Items.Add(discordItem);
+        contextMenu.Items.Add(new Separator());
+        contextMenu.Items.Add(exitItem);
 
         taskbarIcon = new TaskbarIcon
         {
             IconSource = CreateIconSource(),
             ToolTipText = "AutoRP",
-            ContextMenu = menu,
+            ContextMenu = contextMenu,
             Visibility = Visibility.Visible
         };
         taskbarIcon.TrayMouseDoubleClick += (_, _) => OpenRequested?.Invoke(this, EventArgs.Empty);
@@ -124,19 +124,95 @@ public sealed class TrayService : ITrayService
         isDisposed = true;
         autoSwitchService.StateChanged -= OnStateChanged;
         discordRpcService.ConnectionStatusChanged -= OnConnectionStatusChanged;
+        if (contextMenu is not null)
+        {
+            contextMenu.IsOpen = false;
+            if (openItem is not null)
+            {
+                openItem.Click -= OnOpenClick;
+            }
+
+            if (pauseItem is not null)
+            {
+                pauseItem.Click -= OnPauseClick;
+            }
+
+            if (resumeItem is not null)
+            {
+                resumeItem.Click -= OnResumeClick;
+            }
+
+            if (clearItem is not null)
+            {
+                clearItem.Click -= OnClearPresenceClick;
+            }
+
+            if (exitItem is not null)
+            {
+                exitItem.Click -= OnExitClick;
+            }
+
+            contextMenu.Items.Clear();
+        }
+
         if (taskbarIcon is not null)
         {
+            taskbarIcon.ContextMenu = null;
             taskbarIcon.Visibility = Visibility.Hidden;
             taskbarIcon.Dispose();
             taskbarIcon = null;
         }
 
+        contextMenu = null;
+        openItem = null;
+        pauseItem = null;
+        resumeItem = null;
+        statusItem = null;
+        applicationItem = null;
+        profileItem = null;
+        discordItem = null;
+        clearItem = null;
+        exitItem = null;
     }
 
     private void OnExitClick(object sender, RoutedEventArgs e)
     {
+        CloseContextMenu();
         IsExitRequested = true;
         ExitRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void OnOpenClick(object sender, RoutedEventArgs e)
+    {
+        CloseContextMenu();
+        OpenRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void OnPauseClick(object sender, RoutedEventArgs e)
+    {
+        CloseContextMenu();
+        autoSwitchService.SetEnabled(false);
+    }
+
+    private void OnResumeClick(object sender, RoutedEventArgs e)
+    {
+        CloseContextMenu();
+        autoSwitchService.SetEnabled(true);
+    }
+
+    private async void OnClearPresenceClick(object sender, RoutedEventArgs e)
+    {
+        CloseContextMenu();
+        autoSwitchService.MarkPresenceCleared();
+        await discordRpcService.ClearPresenceAsync();
+    }
+
+    private void CloseContextMenu()
+    {
+        if (contextMenu is not null)
+        {
+            contextMenu.IsOpen = false;
+        }
     }
 
     private void OnStateChanged(object? sender, AutoSwitchStateChangedEventArgs e)
