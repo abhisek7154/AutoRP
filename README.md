@@ -1,3 +1,4 @@
+<img width="1312" height="1199" alt="Untitled1111" src="https://github.com/user-attachments/assets/4abd127e-8dda-41b3-b466-e83606e9e850" />
 # AutoRP
 
 AutoRP is a Windows WPF desktop application that publishes Discord Rich Presence based on the active Windows application. Profiles can match executable names, multiple processes, and window-title fragments, with priority-based selection and live editing.
