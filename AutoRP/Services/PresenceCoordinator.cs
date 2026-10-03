@@ -12,6 +12,7 @@ public sealed class PresenceCoordinator : IDisposable
     private readonly AutoRpOptions options;
     private readonly ILogger<PresenceCoordinator> logger;
     private int isDisposed;
+    private int stopStarted;
 
     public event EventHandler<AutoSwitchStateChangedEventArgs>? AutomaticSwitchingStateChanged;
 
@@ -34,6 +35,7 @@ public sealed class PresenceCoordinator : IDisposable
     public async Task StartAsync(CancellationToken cancellationToken = default)
     {
         ObjectDisposedException.ThrowIf(Volatile.Read(ref isDisposed) != 0, this);
+        Volatile.Write(ref stopStarted, 0);
         await discordRpcService.ConnectAsync(cancellationToken);
         autoSwitchService.Start();
         logger.LogInformation("AutoRP monitoring is ready with a {PollingInterval} polling interval.", options.PollingInterval);
@@ -41,8 +43,17 @@ public sealed class PresenceCoordinator : IDisposable
 
     public async Task StopAsync(CancellationToken cancellationToken = default)
     {
+        if (Interlocked.Exchange(ref stopStarted, 1) != 0)
+        {
+            return;
+        }
+
         autoSwitchService.Stop();
-        await discordRpcService.ClearPresenceAsync(cancellationToken);
+        if (discordRpcService.IsConnected)
+        {
+            await discordRpcService.ClearPresenceAsync(cancellationToken);
+        }
+
         await discordRpcService.DisconnectAsync(cancellationToken);
     }
 
@@ -88,6 +99,7 @@ public sealed class PresenceCoordinator : IDisposable
 
     public Task ClearPresenceAsync(CancellationToken cancellationToken = default)
     {
+        autoSwitchService.MarkPresenceCleared();
         return discordRpcService.ClearPresenceAsync(cancellationToken);
     }
 

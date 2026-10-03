@@ -95,14 +95,6 @@ public partial class App : Application
             return;
         }
 
-        var trayService = provider.GetService<ITrayService>();
-        if (trayService is not null)
-        {
-            trayService.OpenRequested -= OnTrayOpenRequested;
-            trayService.ExitRequested -= OnTrayExitRequested;
-            trayService.Dispose();
-        }
-
         var window = MainWindow;
         if (window is not null)
         {
@@ -127,6 +119,14 @@ public partial class App : Application
         }
         finally
         {
+            var trayService = provider.GetService<ITrayService>();
+            if (trayService is not null)
+            {
+                trayService.OpenRequested -= OnTrayOpenRequested;
+                trayService.ExitRequested -= OnTrayExitRequested;
+                trayService.Dispose();
+            }
+
             provider.Dispose();
             serviceProvider = null;
         }

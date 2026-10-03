@@ -71,7 +71,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (!settingsViewModel.CloseToTray)
+        if (!trayService.IsExitRequested && !settingsViewModel.CloseToTray)
         {
             Application.Current.Shutdown();
         }

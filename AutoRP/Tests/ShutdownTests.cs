@@ -40,7 +40,7 @@ public sealed class ShutdownTests
 
         Assert.Equal(1, activeWindow.StartCalls);
         Assert.Equal(1, activeWindow.StopCalls);
-        Assert.Equal(2, discord.DisconnectCalls);
+        Assert.Equal(1, discord.DisconnectCalls);
         Assert.Empty(discord.SetCalls);
 
         if (File.Exists(settingsPath))

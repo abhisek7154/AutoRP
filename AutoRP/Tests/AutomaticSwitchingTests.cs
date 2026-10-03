@@ -89,7 +89,7 @@ public sealed class AutomaticSwitchingTests
     }
 
     [Fact]
-    public async Task ClearsPresenceForUnmatchedApplication()
+    public async Task KeepsPreviousPresenceForUnmatchedApplication()
     {
         var activeWindow = new FakeActiveWindowService(Application("chrome.exe"));
         var discord = new FakeDiscordRpcService();
@@ -99,8 +99,60 @@ public sealed class AutomaticSwitchingTests
         await WaitForAsync(() => discord.SetCalls.Count == 1);
         activeWindow.Raise(Application("unknown.exe"));
 
-        await WaitForAsync(() => discord.ClearCalls == 1);
+        await Task.Delay(20);
+        Assert.Equal(0, discord.ClearCalls);
+        Assert.Equal("chrome", service.EffectiveProfile?.LargeImageKey);
+        Assert.Contains("keeping previous presence", service.StatusMessage, StringComparison.OrdinalIgnoreCase);
         Assert.Null(service.MatchedProfile);
+    }
+
+    [Fact]
+    public async Task AppliesSupportedProfileAfterUnmatchedApplication()
+    {
+        var activeWindow = new FakeActiveWindowService(Application("chrome.exe"));
+        var discord = new FakeDiscordRpcService();
+        using var service = CreateSwitchService(activeWindow, discord);
+
+        service.Start();
+        await WaitForAsync(() => discord.SetCalls.Count == 1);
+        activeWindow.Raise(Application("unknown.exe"));
+        await Task.Delay(20);
+        activeWindow.Raise(Application("Code.exe"));
+
+        await WaitForAsync(() => discord.SetCalls.Count == 2);
+        Assert.Equal("vscode", discord.SetCalls[1].LargeImageKey);
+    }
+
+    [Fact]
+    public async Task UnmatchedStartupDoesNotCreatePresence()
+    {
+        var activeWindow = new FakeActiveWindowService(Application("unknown.exe"));
+        var discord = new FakeDiscordRpcService();
+        using var service = CreateSwitchService(activeWindow, discord);
+
+        service.Start();
+        await Task.Delay(20);
+
+        Assert.Empty(discord.SetCalls);
+        Assert.Equal(0, discord.ClearCalls);
+        Assert.Null(service.EffectiveProfile);
+    }
+
+    [Fact]
+    public async Task ClearingPresenceDoesNotPreventAutomaticReapplication()
+    {
+        var activeWindow = new FakeActiveWindowService(Application("chrome.exe"));
+        var discord = new FakeDiscordRpcService();
+        using var service = CreateSwitchService(activeWindow, discord);
+
+        service.Start();
+        await WaitForAsync(() => discord.SetCalls.Count == 1);
+        service.MarkPresenceCleared();
+        activeWindow.Raise(Application("unknown.exe"));
+        activeWindow.Raise(Application("chrome.exe"));
+
+        await WaitForAsync(() => discord.SetCalls.Count == 2);
+        Assert.Equal("chrome", discord.SetCalls[1].LargeImageKey);
     }
 
     [Fact]

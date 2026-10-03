@@ -51,8 +51,18 @@ public sealed class AutoSwitchService : IDisposable
 
     public ActiveApplication? CurrentApplication => currentApplication;
     public RpcProfile? MatchedProfile => matchedProfile;
+    public RpcProfile? EffectiveProfile => effectiveProfile;
     public DateTimeOffset? LastSwitchTime => lastSwitchTime;
     public string StatusMessage => statusMessage;
+
+    public void MarkPresenceCleared()
+    {
+        lock (stateLock)
+        {
+            effectiveProfile = null;
+            hasAppliedProfile = false;
+        }
+    }
 
     public void Start()
     {
@@ -131,8 +141,9 @@ public sealed class AutoSwitchService : IDisposable
         if (profile is null)
         {
             logger.LogInformation("Foreground application changed: {ProcessName}. No matching profile.", application?.ExecutableName ?? "unknown");
-            SetStatus("No matching profile; Discord presence cleared.");
-            _ = ApplyProfileAsync(null, version);
+            SetStatus(hasAppliedProfile
+                ? "No matching profile; keeping previous presence."
+                : "No matching profile; waiting for a supported application.");
             return;
         }
 
@@ -182,12 +193,14 @@ public sealed class AutoSwitchService : IDisposable
         if (e.IsConnected && IsEnabled)
         {
             long version;
+            RpcProfile? profile;
             lock (stateLock)
             {
                 version = switchVersion;
+                profile = matchedProfile ?? effectiveProfile;
             }
 
-            _ = ApplyProfileAsync(matchedProfile, version);
+            _ = ApplyProfileAsync(profile, version, force: true);
         }
 
         PublishState();
@@ -205,6 +218,11 @@ public sealed class AutoSwitchService : IDisposable
 
     private async Task ApplyProfileAsync(RpcProfile? profile, long version, bool force = false)
     {
+        if (profile is null)
+        {
+            return;
+        }
+
         lock (stateLock)
         {
             if (isDisposed || version != switchVersion || (!force && hasAppliedProfile && ProfilesEqual(profile, effectiveProfile)))
@@ -224,14 +242,7 @@ public sealed class AutoSwitchService : IDisposable
                 }
             }
 
-            if (profile is null)
-            {
-                await discordRpcService.ClearPresenceAsync();
-            }
-            else
-            {
-                await discordRpcService.SetPresenceAsync(profile);
-            }
+            await discordRpcService.SetPresenceAsync(profile);
 
             lock (stateLock)
             {
@@ -250,8 +261,8 @@ public sealed class AutoSwitchService : IDisposable
             effectiveProfile = profile;
             hasAppliedProfile = true;
             lastSwitchTime = DateTimeOffset.Now;
-            SetStatus(profile is null ? "Discord presence cleared." : $"Discord presence updated: {profile.Details}");
-            logger.LogInformation(profile is null ? "Discord presence cleared." : "Discord presence updated.");
+            SetStatus($"Discord presence updated: {profile.Details}");
+            logger.LogInformation("Discord presence updated.");
         }
         catch (Exception exception)
         {

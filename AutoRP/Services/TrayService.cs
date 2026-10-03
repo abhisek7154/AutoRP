@@ -50,7 +50,11 @@ public sealed class TrayService : ITrayService
         var openItem = new MenuItem { Header = "Open AutoRP" };
         openItem.Click += (_, _) => OpenRequested?.Invoke(this, EventArgs.Empty);
         var clearItem = new MenuItem { Header = "Clear Discord Presence" };
-        clearItem.Click += async (_, _) => await discordRpcService.ClearPresenceAsync();
+        clearItem.Click += async (_, _) =>
+        {
+            autoSwitchService.MarkPresenceCleared();
+            await discordRpcService.ClearPresenceAsync();
+        };
         var exitItem = new MenuItem { Header = "Exit" };
         exitItem.Click += OnExitClick;
         menu.Items.Add(openItem);
