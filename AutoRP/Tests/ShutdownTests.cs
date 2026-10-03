@@ -159,6 +159,40 @@ public sealed class ShutdownTests
     }
 
     [Fact]
+    public async Task ShutdownAwaitsAsynchronousForegroundMonitorStop()
+    {
+        using var loggerFactory = LoggerFactory.Create(builder => { });
+        var activeWindow = new FakeActiveWindowService { BlockStop = true };
+        var discord = new FakeDiscordRpcService();
+        using var autoSwitch = new AutoSwitchService(
+            activeWindow,
+            new InMemoryProfileManager(),
+            discord,
+            loggerFactory.CreateLogger<AutoSwitchService>());
+        var settings = new JsonSettingsService(
+            loggerFactory.CreateLogger<JsonSettingsService>(),
+            Path.Combine(Path.GetTempPath(), $"autor p-async-monitor-stop-{Guid.NewGuid():N}.json"));
+        var coordinator = new PresenceCoordinator(
+            discord,
+            autoSwitch,
+            settings,
+            new Configuration.AutoRpOptions { DiscordApplicationId = string.Empty },
+            loggerFactory.CreateLogger<PresenceCoordinator>());
+        await coordinator.StartAsync();
+
+        var stopping = coordinator.StopAsync();
+        await activeWindow.StopStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.False(stopping.IsCompleted);
+        activeWindow.ReleaseStop.TrySetResult();
+        await stopping;
+
+        Assert.Equal(1, activeWindow.StartCalls);
+        Assert.Equal(1, activeWindow.StopCalls);
+        Assert.Equal(1, discord.DisconnectCalls);
+        coordinator.Dispose();
+    }
+
+    [Fact]
     public async Task DiscordAsyncDisposalStopsReconnectAndRejectsLaterWork()
     {
         using var loggerFactory = LoggerFactory.Create(builder => { });
@@ -236,16 +270,67 @@ public sealed class ShutdownTests
         Assert.Equal(1, applicationShutdownCalls);
     }
 
+    [Fact]
+    public async Task TrayExitStillShutsDownWhenDiscordCleanupThrows()
+    {
+        using var loggerFactory = LoggerFactory.Create(builder => { });
+        var activeWindow = new FakeActiveWindowService();
+        var discord = new FakeDiscordRpcService { ThrowOnClear = true, ThrowOnDisconnect = true };
+        using var autoSwitch = new AutoSwitchService(
+            activeWindow,
+            new InMemoryProfileManager(),
+            discord,
+            loggerFactory.CreateLogger<AutoSwitchService>());
+        var settings = new JsonSettingsService(
+            loggerFactory.CreateLogger<JsonSettingsService>(),
+            Path.Combine(Path.GetTempPath(), $"autor p-shutdown-error-{Guid.NewGuid():N}.json"));
+        var presence = new PresenceCoordinator(
+            discord,
+            autoSwitch,
+            settings,
+            new Configuration.AutoRpOptions { DiscordApplicationId = string.Empty },
+            loggerFactory.CreateLogger<PresenceCoordinator>());
+        await presence.StartAsync();
+        using var tray = new TrayService(autoSwitch, discord);
+        var applicationShutdownCalls = 0;
+        var shutdown = new ApplicationShutdownCoordinator(
+            () => presence.StopAsync(),
+            () => applicationShutdownCalls++,
+            loggerFactory.CreateLogger<ApplicationShutdownCoordinator>());
+        Task? pendingShutdown = null;
+        tray.ExitRequested += (_, _) => pendingShutdown = shutdown.ShutdownAsync();
+
+        tray.RequestExit();
+        await pendingShutdown!;
+
+        Assert.Equal(1, activeWindow.StopCalls);
+        Assert.Equal(1, discord.ClearCalls);
+        Assert.Equal(1, discord.DisconnectCalls);
+        Assert.Equal(1, applicationShutdownCalls);
+        presence.Dispose();
+    }
+
     private sealed class FakeActiveWindowService : IActiveWindowService
     {
         public event EventHandler<ActiveApplicationChangedEventArgs>? ApplicationChanged;
         public ActiveApplication? CurrentApplication => null;
         public int StartCalls { get; private set; }
         public int StopCalls { get; private set; }
+        public bool BlockStop { get; init; }
+        public TaskCompletionSource StopStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource ReleaseStop { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public ActiveApplication? GetActiveApplication() => null;
         public void Start() => StartCalls++;
         public void Stop() => StopCalls++;
+        public async Task StopAsync()
+        {
+            if (BlockStop)
+            {
+                StopStarted.TrySetResult();
+                await ReleaseStop.Task;
+            }
+        }
 
         public void Raise(ActiveApplication application)
         {
@@ -270,6 +355,9 @@ public sealed class ShutdownTests
         public bool IsConnected { get; private set; } = true;
         public List<RpcProfile> SetCalls { get; } = [];
         public int DisconnectCalls { get; private set; }
+        public int ClearCalls { get; private set; }
+        public bool ThrowOnClear { get; init; }
+        public bool ThrowOnDisconnect { get; init; }
         public bool BlockPresenceUpdates { get; init; }
         public TaskCompletionSource PresenceUpdateStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource ReleasePresenceUpdate { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -301,11 +389,20 @@ public sealed class ShutdownTests
             }
         }
 
-        public Task ClearPresenceAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task ClearPresenceAsync(CancellationToken cancellationToken = default)
+        {
+            ClearCalls++;
+            return ThrowOnClear ? Task.FromException(new InvalidOperationException("Discord clear failed.")) : Task.CompletedTask;
+        }
 
         public Task DisconnectAsync(CancellationToken cancellationToken = default)
         {
             DisconnectCalls++;
+            if (ThrowOnDisconnect)
+            {
+                return Task.FromException(new InvalidOperationException("Discord disconnect failed."));
+            }
+
             IsConnected = false;
             ConnectionStatusChanged?.Invoke(this, new DiscordConnectionStatusChangedEventArgs(false));
             return Task.CompletedTask;

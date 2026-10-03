@@ -1,6 +1,11 @@
+using Microsoft.Extensions.Logging;
+
 namespace AutoRP.Services;
 
-internal sealed class ApplicationShutdownCoordinator(Func<Task> stopServices, Action shutDownApplication)
+internal sealed class ApplicationShutdownCoordinator(
+    Func<Task> stopServices,
+    Action shutDownApplication,
+    ILogger? logger = null)
 {
     private readonly object sync = new();
     private Task? shutdownTask;
@@ -19,6 +24,7 @@ internal sealed class ApplicationShutdownCoordinator(Func<Task> stopServices, Ac
             shutdownTask = completion.Task;
         }
 
+        logger?.LogInformation("Shutdown requested.");
         _ = RunShutdownAsync(completion);
         return completion.Task;
     }
@@ -31,12 +37,18 @@ internal sealed class ApplicationShutdownCoordinator(Func<Task> stopServices, Ac
             {
                 await stopServices();
             }
+            catch (Exception exception)
+            {
+                logger?.LogError(exception, "One or more services failed during shutdown cleanup.");
+            }
             finally
             {
+                logger?.LogInformation("Calling Application shutdown.");
                 shutDownApplication();
             }
 
             completion.TrySetResult();
+            logger?.LogInformation("Shutdown completed.");
         }
         catch (Exception exception)
         {

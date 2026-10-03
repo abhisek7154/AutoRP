@@ -13,6 +13,7 @@ public sealed class WindowsActiveWindowService : IActiveWindowService, IDisposab
     private readonly object stateLock = new();
     private CancellationTokenSource? pollingCancellation;
     private Task? pollingTask;
+    private Task? pollingStopTask;
     private ActiveApplication? currentApplication;
 
     public WindowsActiveWindowService(
@@ -83,6 +84,7 @@ public sealed class WindowsActiveWindowService : IActiveWindowService, IDisposab
 
             pollingCancellation = new CancellationTokenSource();
             pollingTask = PollAsync(pollingCancellation.Token);
+            pollingStopTask = null;
         }
 
         logger.LogInformation("Foreground application detection started with a {PollingInterval} interval.", pollingInterval);
@@ -91,30 +93,56 @@ public sealed class WindowsActiveWindowService : IActiveWindowService, IDisposab
 
     public void Stop()
     {
+        _ = StopAsync();
+    }
+
+    public Task StopAsync()
+    {
         CancellationTokenSource? cancellation;
         Task? task;
         lock (stateLock)
         {
+            if (pollingStopTask is not null)
+            {
+                return pollingStopTask;
+            }
+
             cancellation = pollingCancellation;
             task = pollingTask;
-            pollingCancellation = null;
-            pollingTask = null;
-        }
+            if (cancellation is null)
+            {
+                return Task.CompletedTask;
+            }
 
-        cancellation?.Cancel();
-        if (task is not null && !task.IsCompleted)
+            cancellation.Cancel();
+            pollingStopTask = Task.Run(() => FinishStopAsync(task, cancellation));
+            return pollingStopTask;
+        }
+    }
+
+    private async Task FinishStopAsync(Task? task, CancellationTokenSource cancellation)
+    {
+        try
         {
-            try
+            if (task is not null)
             {
-                task.GetAwaiter().GetResult();
+                await task.ConfigureAwait(false);
             }
-            catch (OperationCanceledException)
+        }
+        finally
+        {
+            cancellation.Dispose();
+            lock (stateLock)
             {
-                // Normal shutdown.
+                if (ReferenceEquals(pollingCancellation, cancellation))
+                {
+                    pollingCancellation = null;
+                    pollingTask = null;
+                    pollingStopTask = null;
+                }
             }
         }
 
-        cancellation?.Dispose();
         logger.LogInformation("Foreground application detection stopped.");
     }
 
@@ -128,7 +156,7 @@ public sealed class WindowsActiveWindowService : IActiveWindowService, IDisposab
         using var timer = new PeriodicTimer(pollingInterval);
         try
         {
-            while (await timer.WaitForNextTickAsync(cancellationToken))
+            while (await timer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false))
             {
                 PublishApplication(GetActiveApplication());
             }

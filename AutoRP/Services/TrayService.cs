@@ -1,4 +1,5 @@
 using Hardcodet.Wpf.TaskbarNotification;
+using Microsoft.Extensions.Logging;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media.Imaging;
@@ -10,6 +11,7 @@ public sealed class TrayService : ITrayService
 {
     private readonly AutoSwitchService autoSwitchService;
     private readonly IDiscordRpcService discordRpcService;
+    private readonly ILogger<TrayService>? logger;
     private TaskbarIcon? taskbarIcon;
     private ContextMenu? contextMenu;
     private MenuItem? openItem;
@@ -23,10 +25,14 @@ public sealed class TrayService : ITrayService
     private MenuItem? exitItem;
     private bool isDisposed;
 
-    public TrayService(AutoSwitchService autoSwitchService, IDiscordRpcService discordRpcService)
+    public TrayService(
+        AutoSwitchService autoSwitchService,
+        IDiscordRpcService discordRpcService,
+        ILogger<TrayService>? logger = null)
     {
         this.autoSwitchService = autoSwitchService;
         this.discordRpcService = discordRpcService;
+        this.logger = logger;
         autoSwitchService.StateChanged += OnStateChanged;
         discordRpcService.ConnectionStatusChanged += OnConnectionStatusChanged;
     }
@@ -178,10 +184,11 @@ public sealed class TrayService : ITrayService
 
     private void OnExitClick(object sender, RoutedEventArgs e)
     {
+        logger?.LogInformation("Tray Exit menu item clicked.");
         RequestExit();
     }
 
-    internal void RequestExit()
+    public void RequestExit()
     {
         if (IsExitRequested)
         {
@@ -190,6 +197,7 @@ public sealed class TrayService : ITrayService
 
         CloseContextMenu();
         IsExitRequested = true;
+        logger?.LogInformation("Tray exit request dispatched after closing the context menu.");
         // Let WPF finish the routed click and close the native popup before teardown.
         var dispatcher = Application.Current?.Dispatcher;
         if (dispatcher is null || dispatcher.HasShutdownStarted)

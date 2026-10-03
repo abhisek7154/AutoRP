@@ -108,6 +108,7 @@ public sealed class AutoSwitchService : IDisposable
     public async Task StopAsync()
     {
         Stop();
+        await activeWindowService.StopAsync();
         while (true)
         {
             Task[] pending;

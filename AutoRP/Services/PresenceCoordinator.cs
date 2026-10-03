@@ -111,6 +111,7 @@ public sealed class PresenceCoordinator : IDisposable
                 }
             }
 
+            logger.LogInformation("Stopping automatic switching and foreground monitoring.");
             await autoSwitchService.StopAsync();
             while (true)
             {
@@ -132,11 +133,13 @@ public sealed class PresenceCoordinator : IDisposable
             {
                 if (discordRpcService.IsConnected)
                 {
+                    logger.LogInformation("Disconnecting Discord Rich Presence.");
                     await discordRpcService.ClearPresenceAsync(cancellationToken);
                 }
             }
             finally
             {
+                logger.LogInformation("Disconnecting Discord RPC client.");
                 await discordRpcService.DisconnectAsync(CancellationToken.None);
             }
 

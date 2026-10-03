@@ -5,6 +5,7 @@ using AutoRP.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Windows;
+using System.Windows.Threading;
 
 namespace AutoRP;
 
@@ -12,6 +13,7 @@ public partial class App : Application
 {
     private ServiceProvider? serviceProvider;
     private ApplicationShutdownCoordinator? shutdownCoordinator;
+    private ILogger<App>? logger;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -20,7 +22,8 @@ public partial class App : Application
         var services = new ServiceCollection();
         ConfigureServices(services);
         serviceProvider = services.BuildServiceProvider();
-        shutdownCoordinator = new ApplicationShutdownCoordinator(ShutdownServicesAsync, Shutdown);
+        logger = serviceProvider.GetRequiredService<ILogger<App>>();
+        shutdownCoordinator = new ApplicationShutdownCoordinator(ShutdownServicesAsync, ShutdownOnDispatcher, logger);
 
         MainWindow = serviceProvider.GetRequiredService<MainWindow>();
         var trayService = serviceProvider.GetRequiredService<ITrayService>();
@@ -28,10 +31,18 @@ public partial class App : Application
         trayService.ExitRequested += OnTrayExitRequested;
         MainWindow.Show();
         trayService.Start();
+
+        // Allows the exact packaged executable to exercise the production tray-exit event
+        // path when desktop automation cannot reach the notification area.
+        if (e.Args.Contains("--test-tray-exit", StringComparer.OrdinalIgnoreCase))
+        {
+            Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, new Action(trayService.RequestExit));
+        }
     }
 
     protected override void OnExit(ExitEventArgs e)
     {
+        logger?.LogInformation("WPF application exit completed.");
         base.OnExit(e);
     }
 
@@ -66,9 +77,18 @@ public partial class App : Application
         MainWindow.Activate();
     }
 
-    private void OnTrayExitRequested(object? sender, EventArgs e)
+    private async void OnTrayExitRequested(object? sender, EventArgs e)
     {
-        _ = ShutdownApplicationAsync();
+        logger?.LogInformation("Tray Exit clicked.");
+        try
+        {
+            await ShutdownApplicationAsync();
+        }
+        catch (Exception exception)
+        {
+            logger?.LogError(exception, "Shutdown coordinator failed.");
+            ShutdownOnDispatcher();
+        }
     }
 
     public Task ShutdownApplicationAsync() => shutdownCoordinator?.ShutdownAsync() ?? Task.CompletedTask;
@@ -88,9 +108,8 @@ public partial class App : Application
             {
                 trayService.OpenRequested -= OnTrayOpenRequested;
                 trayService.ExitRequested -= OnTrayExitRequested;
-                trayService.Dispose();
+                TryCleanup("tray resources", trayService.Dispose);
             }
-
         }
         finally
         {
@@ -101,12 +120,12 @@ public partial class App : Application
                 {
                     foreach (var ownedWindow in window.OwnedWindows.OfType<Window>().ToArray())
                     {
-                        ownedWindow.Close();
+                        TryCleanup($"owned window '{ownedWindow.Title}'", ownedWindow.Close);
                     }
 
                     if (window.IsLoaded)
                     {
-                        window.Close();
+                        TryCleanup("main window", window.Close);
                     }
                 }
             }
@@ -117,14 +136,20 @@ public partial class App : Application
                     var coordinator = provider.GetService<PresenceCoordinator>();
                     if (coordinator is not null)
                     {
-                        await coordinator.StopAsync();
+                        logger?.LogInformation("Stopping foreground monitor and automatic switching.");
+                        await TryCleanupAsync("presence services", () => coordinator.StopAsync());
                     }
                 }
                 finally
                 {
                     try
                     {
+                        logger?.LogInformation("Disposing application services.");
                         await provider.DisposeAsync();
+                    }
+                    catch (Exception exception)
+                    {
+                        logger?.LogError(exception, "Application service disposal failed.");
                     }
                     finally
                     {
@@ -132,6 +157,46 @@ public partial class App : Application
                     }
                 }
             }
+        }
+    }
+
+    private void ShutdownOnDispatcher()
+    {
+        if (Dispatcher.HasShutdownStarted || Dispatcher.HasShutdownFinished)
+        {
+            return;
+        }
+
+        if (Dispatcher.CheckAccess())
+        {
+            Shutdown();
+            return;
+        }
+
+        Dispatcher.InvokeAsync(Shutdown, DispatcherPriority.Send);
+    }
+
+    private void TryCleanup(string name, Action cleanup)
+    {
+        try
+        {
+            cleanup();
+        }
+        catch (Exception exception)
+        {
+            logger?.LogError(exception, "Failed to clean up {Resource} during shutdown.", name);
+        }
+    }
+
+    private async Task TryCleanupAsync(string name, Func<Task> cleanup)
+    {
+        try
+        {
+            await cleanup();
+        }
+        catch (Exception exception)
+        {
+            logger?.LogError(exception, "Failed to clean up {Resource} during shutdown.", name);
         }
     }
 }

@@ -9,4 +9,8 @@ public interface IActiveWindowService
     ActiveApplication? GetActiveApplication();
     void Start();
     void Stop();
+    Task StopAsync()
+    {
+        return Task.CompletedTask;
+    }
 }
