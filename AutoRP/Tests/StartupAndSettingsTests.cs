@@ -19,6 +19,29 @@ public sealed class StartupAndSettingsTests
     }
 
     [Fact]
+    public void SettingsPersistDiscordApplicationIdAcrossReloads()
+    {
+        using var context = TestContext.Create();
+        context.Settings.Update(new AutoRpSettings(DiscordApplicationId: "1555848769206095943"));
+
+        using var reloaded = new TestContext(context.Path);
+
+        Assert.Equal("1555848769206095943", reloaded.Settings.Current.DiscordApplicationId);
+    }
+
+    [Fact]
+    public void ClearingDiscordApplicationIdPersistsAnUnconfiguredValue()
+    {
+        using var context = TestContext.Create();
+        context.Settings.Update(new AutoRpSettings(DiscordApplicationId: "configured"));
+        context.Settings.Update(context.Settings.Current with { DiscordApplicationId = string.Empty });
+
+        using var reloaded = new TestContext(context.Path);
+
+        Assert.Equal(string.Empty, reloaded.Settings.Current.DiscordApplicationId);
+    }
+
+    [Fact]
     public void EnablingStartupRegistersOnceAndDisablingRemovesRegistration()
     {
         using var context = TestContext.Create();

@@ -8,6 +8,7 @@ public sealed class PresenceCoordinator
 {
     private readonly IDiscordRpcService discordRpcService;
     private readonly AutoSwitchService autoSwitchService;
+    private readonly ISettingsService settingsService;
     private readonly AutoRpOptions options;
     private readonly ILogger<PresenceCoordinator> logger;
 
@@ -16,14 +17,17 @@ public sealed class PresenceCoordinator
     public PresenceCoordinator(
         IDiscordRpcService discordRpcService,
         AutoSwitchService autoSwitchService,
+        ISettingsService settingsService,
         AutoRpOptions options,
         ILogger<PresenceCoordinator> logger)
     {
         this.discordRpcService = discordRpcService;
         this.autoSwitchService = autoSwitchService;
+        this.settingsService = settingsService;
         this.options = options;
         this.logger = logger;
         autoSwitchService.StateChanged += OnAutomaticSwitchingStateChanged;
+        settingsService.SettingsChanged += OnSettingsChanged;
     }
 
     public async Task StartAsync(CancellationToken cancellationToken = default)
@@ -41,6 +45,8 @@ public sealed class PresenceCoordinator
     }
 
     public bool IsDiscordConnected => discordRpcService.IsConnected;
+    public bool IsDiscordApplicationIdConfigured => !string.IsNullOrWhiteSpace(settingsService.Current.DiscordApplicationId)
+        || !string.IsNullOrWhiteSpace(options.DiscordApplicationId);
     public bool IsAutomaticSwitchingEnabled => autoSwitchService.IsEnabled;
     public ActiveApplication? CurrentApplication => autoSwitchService.CurrentApplication;
     public RpcProfile? MatchedProfile => autoSwitchService.MatchedProfile;
@@ -92,5 +98,22 @@ public sealed class PresenceCoordinator
     private void OnAutomaticSwitchingStateChanged(object? sender, AutoSwitchStateChangedEventArgs e)
     {
         AutomaticSwitchingStateChanged?.Invoke(this, e);
+    }
+
+    private void OnSettingsChanged(object? sender, EventArgs e)
+    {
+        _ = ReinitializeDiscordAsync();
+    }
+
+    private async Task ReinitializeDiscordAsync()
+    {
+        try
+        {
+            await discordRpcService.ReinitializeAsync();
+        }
+        catch (Exception exception)
+        {
+            logger.LogWarning(exception, "Discord RPC could not be reinitialized after settings changed.");
+        }
     }
 }

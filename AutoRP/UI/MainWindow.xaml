@@ -77,6 +77,13 @@
         <Border Grid.Row="4" Margin="0,0,0,16" Padding="14" Style="{StaticResource StatusCardStyle}">
             <StackPanel>
                 <TextBlock Style="{StaticResource LabelStyle}" Text="SETTINGS" />
+                <TextBlock Margin="0,8,0,4" Style="{StaticResource FooterStyle}" Text="DISCORD APPLICATION ID" />
+                <TextBox x:Name="DiscordApplicationIdTextBox" Margin="0,0,0,4" />
+                <TextBlock x:Name="DiscordApplicationIdStatusText" Style="{StaticResource FooterStyle}" Text="Status: Not configured" />
+                <WrapPanel Margin="0,8,0,4">
+                    <Button Margin="0,0,8,0" Click="OnSaveDiscordApplicationIdClick" Content="Save" />
+                    <Button Click="OnClearDiscordApplicationIdClick" Content="Clear" />
+                </WrapPanel>
                 <TextBlock Margin="0,8,0,4" Style="{StaticResource FooterStyle}" Text="STARTUP" />
                 <CheckBox x:Name="StartWithWindowsCheckBox" Content="Start AutoRP with Windows" />
                 <TextBlock Margin="0,12,0,4" Style="{StaticResource FooterStyle}" Text="BEHAVIOR" />

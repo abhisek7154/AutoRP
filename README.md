@@ -50,27 +50,29 @@ Discord RPC Service
 1. Open the [Discord Developer Portal](https://discord.com/developers/applications).
 2. Select **New Application**, name it, and create it.
 3. Open **General Information** and copy the **Application ID**.
-4. Set it in the current PowerShell session before launching AutoRP:
+4. Enter the ID in AutoRP's **Settings > Discord Application ID** field and select **Save**. AutoRP stores it in `%LOCALAPPDATA%\AutoRP\settings.json` and reloads it on later launches. **Clear** removes the saved value.
+
+The environment variable remains available as a fallback for scripted or first-time launches:
 
    ```powershell
    $env:AUTORP_DISCORD_APPLICATION_ID = "your-application-id"
    ```
 
-`AutoRpOptions.DiscordApplicationId` reads this environment variable at startup. Never commit an Application ID, token, secret, or machine-specific configuration. A missing Application ID is supported; AutoRP remains open and retries without publishing presence.
+The saved UI value takes priority over `AUTORP_DISCORD_APPLICATION_ID`. Never commit an Application ID, token, secret, or machine-specific configuration. A missing Application ID is supported; AutoRP remains open and reports `Discord Application ID not configured.` without publishing presence.
 
 ## Discord Artwork
 
-AutoRP uses the Discord-hosted large asset key `autorp_anime` for the seeded profiles and sample presence. To enable the artwork:
+AutoRP uses Discord-hosted asset keys. The seeded profiles use `firefox`, `vscode`, `spotify`, and `chrome`; the sample presence uses `autorp_anime`. These are examples and do not exist automatically:
 
 1. Open the [Discord Developer Portal](https://discord.com/developers/applications).
 2. Open the AutoRP application.
 3. Go to **Rich Presence** / **Art Assets**.
-4. Upload the generated anime artwork.
-5. Set the asset name/key to exactly `autorp_anime`.
-6. Configure `AUTORP_DISCORD_APPLICATION_ID` as described above.
+4. Upload images for the keys used by your profiles.
+5. Set each asset name/key exactly to the value entered in the profile editor.
+6. Configure the Application ID in AutoRP as described above.
 7. Start AutoRP and verify the artwork appears in Discord Rich Presence.
 
-The asset key must exactly match the name uploaded in the Developer Portal. Existing or edited profiles can still provide their own `LargeImageKey`; `SmallImageKey` and its text remain supported. The image file itself is not required in this repository because Discord serves the uploaded asset.
+The asset key must exactly match the name uploaded in the Developer Portal. Existing or edited profiles can provide `LargeImageKey`, `LargeImageText`, `SmallImageKey`, and `SmallImageText`. AutoRP never uploads local images; Discord serves the uploaded asset.
 
 ## Running From Source
 
@@ -212,20 +214,20 @@ dotnet publish .\AutoRP\AutoRP.csproj `
 	--nologo
 ```
 
-Copy the published folder to the target Windows machine and set `AUTORP_DISCORD_APPLICATION_ID` before first launch. The package includes the application icon and does not include user profiles, settings, tests, debug output, or secrets. User profiles and settings remain under `%LOCALAPPDATA%\AutoRP` and are not overwritten by an application update.
+Copy the published folder to the target Windows machine. Configure the Application ID in the AutoRP Settings section after launch; the package includes the application icon and does not include user profiles, settings, tests, debug output, or secrets. User profiles and settings remain under `%LOCALAPPDATA%\AutoRP` and are not overwritten by an application update.
 
 ## Configure Discord Rich Presence
 
 1. Open the [Discord Developer Portal](https://discord.com/developers/applications) and sign in.
 2. Select **New Application**, enter `AutoRP` as the application name, and create it.
 3. On the application's **General Information** page, copy the **Application ID**.
-4. Set the copied value in the current PowerShell session before launching AutoRP:
+4. Enter the copied value in AutoRP's Settings section and select Save. For scripted launches, the environment variable remains a fallback:
 
 	```powershell
 	$env:AUTORP_DISCORD_APPLICATION_ID = "your-application-id"
 	```
 
-	`AutoRpOptions` reads this environment variable at startup, so the Application ID is not committed to source control.
+	The saved UI value takes priority over this environment variable, so the Application ID is not committed to source control.
 5. In the application's **Rich Presence > Art Assets** page, upload any images used by a profile and use their asset keys for `LargeImageKey` or `SmallImageKey`.
 6. Start Discord before AutoRP. Use **Set sample presence** to test the connection and **Clear presence** to remove it.
 

@@ -14,7 +14,7 @@ public sealed class AutoRpOptions
             ProcessName: "Code.exe",
             Details: "Coding in Visual Studio Code",
             State: "Building AutoRP",
-            LargeImageKey: "autorp_anime",
+            LargeImageKey: "vscode",
             LargeImageText: "Visual Studio Code")
         {
             Name = "Visual Studio Code",
@@ -25,7 +25,7 @@ public sealed class AutoRpOptions
             ProcessName: "chrome.exe",
             Details: "Browsing with Chrome",
             State: "Researching AutoRP",
-            LargeImageKey: "autorp_anime",
+            LargeImageKey: "chrome",
             LargeImageText: "Google Chrome")
         {
             Name = "Google Chrome",
@@ -36,7 +36,7 @@ public sealed class AutoRpOptions
             ProcessName: "firefox.exe",
             Details: "Browsing with Firefox",
             State: "Researching AutoRP",
-            LargeImageKey: "autorp_anime",
+            LargeImageKey: "firefox",
             LargeImageText: "Mozilla Firefox")
         {
             Name = "Mozilla Firefox",
@@ -47,7 +47,7 @@ public sealed class AutoRpOptions
             ProcessName: "Spotify.exe",
             Details: "Listening on Spotify",
             State: "Enjoying music",
-            LargeImageKey: "autorp_anime",
+            LargeImageKey: "spotify",
             LargeImageText: "Spotify")
         {
             Name = "Spotify",

@@ -23,6 +23,8 @@ public sealed class JsonSettingsService : ISettingsService
 
     public AutoRpSettings Current { get; private set; }
 
+    public event EventHandler? SettingsChanged;
+
     public void Update(AutoRpSettings settings)
     {
         var directory = Path.GetDirectoryName(storagePath);
@@ -37,6 +39,7 @@ public sealed class JsonSettingsService : ISettingsService
             File.WriteAllText(temporaryPath, JsonSerializer.Serialize(settings, serializerOptions));
             File.Move(temporaryPath, storagePath, true);
             Current = settings;
+            SettingsChanged?.Invoke(this, EventArgs.Empty);
         }
         finally
         {

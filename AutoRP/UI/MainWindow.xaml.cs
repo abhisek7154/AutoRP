@@ -133,6 +133,16 @@ public partial class MainWindow : Window
         }
     }
 
+    private void OnSaveDiscordApplicationIdClick(object sender, RoutedEventArgs e)
+    {
+        RunSettingsAction(() => settingsViewModel.SetDiscordApplicationId(DiscordApplicationIdTextBox.Text));
+    }
+
+    private void OnClearDiscordApplicationIdClick(object sender, RoutedEventArgs e)
+    {
+        RunSettingsAction(settingsViewModel.ClearDiscordApplicationId);
+    }
+
     private void OnAddProfileClick(object sender, RoutedEventArgs e)
     {
         var editor = new ProfileEditorWindow(new ProfileEditorViewModel()) { Owner = this };
@@ -238,13 +248,21 @@ public partial class MainWindow : Window
 
     private void RefreshRpcStatus()
     {
-        RpcStatusText.Text = presenceCoordinator.IsDiscordConnected ? "Connected" : "Disconnected";
+        RpcStatusText.Text = presenceCoordinator.IsDiscordConnected
+            ? "Connected"
+            : presenceCoordinator.IsDiscordApplicationIdConfigured
+                ? "Disconnected"
+                : "Discord Application ID not configured.";
     }
 
     private void RefreshSettings()
     {
         StartWithWindowsCheckBox.IsChecked = settingsViewModel.StartWithWindows;
         CloseToTrayCheckBox.IsChecked = settingsViewModel.CloseToTray;
+        DiscordApplicationIdTextBox.Text = settingsViewModel.DiscordApplicationId;
+        DiscordApplicationIdStatusText.Text = presenceCoordinator.IsDiscordApplicationIdConfigured
+            ? "Status: Configured"
+            : "Status: Not configured";
     }
 
     private async Task RunRpcActionAsync(Func<Task> action)

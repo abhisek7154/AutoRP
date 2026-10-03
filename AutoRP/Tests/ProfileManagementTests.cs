@@ -10,12 +10,15 @@ namespace AutoRP.Tests;
 public sealed class ProfileManagementTests
 {
     [Fact]
-    public void SeededProfilesUseTheDiscordAnimeAssetKey()
+    public void SeededProfilesUsePerApplicationArtworkKeys()
     {
         var options = new AutoRpOptions();
 
         Assert.NotEmpty(options.Profiles);
-        Assert.All(options.Profiles, profile => Assert.Equal("autorp_anime", profile.LargeImageKey));
+        Assert.Equal("vscode", options.Profiles.Single(profile => profile.ProcessName == "Code.exe").LargeImageKey);
+        Assert.Equal("chrome", options.Profiles.Single(profile => profile.ProcessName == "chrome.exe").LargeImageKey);
+        Assert.Equal("firefox", options.Profiles.Single(profile => profile.ProcessName == "firefox.exe").LargeImageKey);
+        Assert.Equal("spotify", options.Profiles.Single(profile => profile.ProcessName == "Spotify.exe").LargeImageKey);
     }
 
     [Fact]
@@ -81,6 +84,27 @@ public sealed class ProfileManagementTests
         Assert.Equal("autorp_anime", discord.LastProfile?.LargeImageKey);
     }
 
+    [Fact]
+    public async Task TestPresencePreservesLargeAndSmallArtworkKeys()
+    {
+        using var context = TestContext.Create();
+        var profile = Profile("Artwork", "artwork.exe", "Artwork") with
+        {
+            LargeImageKey = "firefox",
+            SmallImageKey = "autorp_anime"
+        };
+        context.Configuration.AddProfile(profile);
+        using var manager = new PresenceProfileManager(context.Configuration);
+        var discord = new RecordingDiscordService();
+        using var viewModel = new ProfileManagementViewModel(context.Configuration, manager, discord);
+        viewModel.SelectedProfile = viewModel.Profiles.Single();
+
+        await viewModel.TestSelectedProfileAsync();
+
+        Assert.Equal("firefox", discord.LastProfile?.LargeImageKey);
+        Assert.Equal("autorp_anime", discord.LastProfile?.SmallImageKey);
+    }
+
     private static RpcProfile Profile(string name, string processName, string details)
     {
         return new RpcProfile(processName, details, "Testing", LargeImageKey: "autorp_anime") { Name = name };
@@ -131,6 +155,7 @@ public sealed class ProfileManagementTests
         public RpcProfile? LastProfile { get; private set; }
 
         public Task ConnectAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task ReinitializeAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task SetPresenceAsync(RpcProfile profile, CancellationToken cancellationToken = default)
         {
             LastProfile = profile;

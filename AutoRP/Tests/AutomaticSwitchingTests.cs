@@ -18,6 +18,41 @@ public sealed class AutomaticSwitchingTests
     }
 
     [Fact]
+    public void FirefoxAndVisualStudioCodeProfilesHaveDistinctArtworkKeys()
+    {
+        var manager = CreateManager();
+
+        Assert.Equal("firefox", manager.FindProfile(Application("firefox.exe"))?.LargeImageKey);
+        Assert.Equal("vscode", manager.FindProfile(Application("Code.exe"))?.LargeImageKey);
+    }
+
+    [Fact]
+    public async Task ChangingSettingsReinitializesDiscordRpc()
+    {
+        var settingsPath = Path.Combine(Path.GetTempPath(), $"autor p-runtime-settings-{Guid.NewGuid():N}.json");
+        using var loggerFactory = LoggerFactory.Create(builder => { });
+        var settings = new JsonSettingsService(loggerFactory.CreateLogger<JsonSettingsService>(), settingsPath);
+        var activeWindow = new FakeActiveWindowService(Application("chrome.exe"));
+        var discord = new FakeDiscordRpcService();
+        var autoSwitch = CreateSwitchService(activeWindow, discord);
+        _ = new PresenceCoordinator(
+            discord,
+            autoSwitch,
+            settings,
+            new AutoRpOptions { DiscordApplicationId = string.Empty },
+            loggerFactory.CreateLogger<PresenceCoordinator>());
+
+        settings.Update(new AutoRpSettings(DiscordApplicationId: "new-id"));
+        await WaitForAsync(() => discord.ReinitializeCalls == 1);
+
+        autoSwitch.Dispose();
+        if (File.Exists(settingsPath))
+        {
+            File.Delete(settingsPath);
+        }
+    }
+
+    [Fact]
     public void ReturnsNullWhenNoProfileMatches()
     {
         Assert.Null(CreateManager().FindProfile(Application("unknown.exe")));
@@ -40,6 +75,7 @@ public sealed class AutomaticSwitchingTests
         activeWindow.Raise(Application("Code.exe"));
         await WaitForAsync(() => discord.SetCalls.Count == 2);
         Assert.Equal("Code", discord.SetCalls[1].Details);
+        Assert.Equal("vscode", discord.SetCalls[1].LargeImageKey);
     }
 
     [Fact]
@@ -143,8 +179,9 @@ public sealed class AutomaticSwitchingTests
         {
             Profiles =
             [
-                new RpcProfile("chrome.exe", "Chrome", "Browsing"),
-                new RpcProfile("Code.exe", "Code", "Coding")
+                new RpcProfile("chrome.exe", "Chrome", "Browsing", LargeImageKey: "chrome"),
+                new RpcProfile("Code.exe", "Code", "Coding", LargeImageKey: "vscode"),
+                new RpcProfile("firefox.exe", "Firefox", "Browsing", LargeImageKey: "firefox")
             ]
         });
     }
@@ -208,12 +245,18 @@ public sealed class AutomaticSwitchingTests
         public event EventHandler<DiscordConnectionStatusChangedEventArgs>? ConnectionStatusChanged;
         public bool IsConnected { get; set; } = true;
         public List<RpcProfile> SetCalls { get; } = [];
+        public int ReinitializeCalls { get; private set; }
         public int ClearCalls { get; private set; }
         public bool BlockNextSetCall { get; set; }
         public TaskCompletionSource SetStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource ReleaseSet { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public Task ConnectAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task ReinitializeAsync(CancellationToken cancellationToken = default)
+        {
+            ReinitializeCalls++;
+            return Task.CompletedTask;
+        }
 
         public async Task SetPresenceAsync(RpcProfile profile, CancellationToken cancellationToken = default)
         {

@@ -197,6 +197,7 @@ public sealed class AdvancedMatchingTests
         public TaskCompletionSource FirstCallStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource ReleaseFirstCall { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public Task ConnectAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task ReinitializeAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task SetPresenceAsync(RpcProfile profile, CancellationToken cancellationToken = default)
         {
             SetCalls.Add(profile);

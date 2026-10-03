@@ -8,6 +8,7 @@ namespace AutoRP.Services;
 
 public sealed class DiscordRpcService(
     AutoRpOptions options,
+    ISettingsService settingsService,
     ILogger<DiscordRpcService> logger) : IDiscordRpcService, IDisposable
 {
     private static readonly TimeSpan ReconnectInterval = TimeSpan.FromSeconds(5);
@@ -44,6 +45,12 @@ public sealed class DiscordRpcService(
         {
             connectionGate.Release();
         }
+    }
+
+    public async Task ReinitializeAsync(CancellationToken cancellationToken = default)
+    {
+        await DisconnectAsync(cancellationToken);
+        await ConnectAsync(cancellationToken);
     }
 
     public async Task SetPresenceAsync(RpcProfile profile, CancellationToken cancellationToken = default)
@@ -140,7 +147,10 @@ public sealed class DiscordRpcService(
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(options.DiscordApplicationId))
+        var applicationId = string.IsNullOrWhiteSpace(settingsService.Current.DiscordApplicationId)
+            ? options.DiscordApplicationId
+            : settingsService.Current.DiscordApplicationId;
+        if (string.IsNullOrWhiteSpace(applicationId))
         {
             logger.LogWarning("Discord RPC is disabled because DiscordApplicationId is not configured.");
             ScheduleReconnect();
@@ -150,7 +160,7 @@ public sealed class DiscordRpcService(
         try
         {
             client?.Dispose();
-            client = new DiscordRpcClient(options.DiscordApplicationId);
+            client = new DiscordRpcClient(applicationId);
             client.Initialize();
             SetConnectionState(true);
             if (lastProfile is not null)
