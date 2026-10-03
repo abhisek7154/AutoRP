@@ -10,18 +10,19 @@
         MaxHeight="1000"
         WindowStartupLocation="CenterScreen"
         Closing="OnClosing">
-    <ScrollViewer VerticalScrollBarVisibility="Auto"
-                  HorizontalScrollBarVisibility="Disabled"
-                  CanContentScroll="False"
-                  PanningMode="VerticalOnly">
-        <Grid Margin="32">
+    <Grid>
+        <ScrollViewer VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled"
+                      CanContentScroll="False"
+                      PanningMode="VerticalOnly">
+            <Grid Margin="32" VerticalAlignment="Top">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -122,6 +123,7 @@
 
         <TextBlock Grid.Row="7" Style="{StaticResource FooterStyle}" Text="DISCORD RPC STATUS" />
         <TextBlock x:Name="RpcStatusText" Grid.Row="8" Margin="0,4,0,0" Style="{StaticResource FooterStyle}" Text="Disconnected" />
-        </Grid>
-    </ScrollViewer>
+            </Grid>
+        </ScrollViewer>
+    </Grid>
 </Window>
