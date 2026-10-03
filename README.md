@@ -6,7 +6,7 @@ AutoRP automatically changes your Discord Rich Presence based on the Windows app
 
 ## Quick Start
 
-1. Download and run AutoRP.
+1. Download the AutoRP Windows ZIP, extract it, and run `AutoRP.exe`.
 2. Start Discord.
 3. Open **Settings** in AutoRP.
 4. Enter your Discord Application ID and click **Save**.
