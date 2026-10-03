@@ -122,8 +122,14 @@ public partial class App : Application
                 }
                 finally
                 {
-                    provider.Dispose();
-                    serviceProvider = null;
+                    try
+                    {
+                        await provider.DisposeAsync();
+                    }
+                    finally
+                    {
+                        serviceProvider = null;
+                    }
                 }
             }
         }

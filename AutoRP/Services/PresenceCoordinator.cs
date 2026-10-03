@@ -13,6 +13,9 @@ public sealed class PresenceCoordinator : IDisposable
     private readonly ILogger<PresenceCoordinator> logger;
     private int isDisposed;
     private int stopStarted;
+    private readonly object lifecycleLock = new();
+    private Task? startTask;
+    private Task? stopTask;
     private readonly object backgroundLock = new();
     private readonly HashSet<Task> backgroundTasks = [];
 
@@ -34,46 +37,115 @@ public sealed class PresenceCoordinator : IDisposable
         settingsService.SettingsChanged += OnSettingsChanged;
     }
 
-    public async Task StartAsync(CancellationToken cancellationToken = default)
+    public Task StartAsync(CancellationToken cancellationToken = default)
     {
-        ObjectDisposedException.ThrowIf(Volatile.Read(ref isDisposed) != 0, this);
-        Volatile.Write(ref stopStarted, 0);
-        await discordRpcService.ConnectAsync(cancellationToken);
-        autoSwitchService.Start();
-        logger.LogInformation("AutoRP monitoring is ready with a {PollingInterval} polling interval.", options.PollingInterval);
+        lock (lifecycleLock)
+        {
+            ObjectDisposedException.ThrowIf(Volatile.Read(ref isDisposed) != 0, this);
+            if (stopTask is not null)
+            {
+                return Task.CompletedTask;
+            }
+
+            startTask ??= StartCoreAsync(cancellationToken);
+            return startTask;
+        }
     }
 
-    public async Task StopAsync(CancellationToken cancellationToken = default)
+    private async Task StartCoreAsync(CancellationToken cancellationToken)
     {
-        if (Interlocked.Exchange(ref stopStarted, 1) != 0)
+        await discordRpcService.ConnectAsync(cancellationToken);
+        if (Volatile.Read(ref stopStarted) != 0)
         {
             return;
         }
 
-        autoSwitchService.StateChanged -= OnAutomaticSwitchingStateChanged;
-        settingsService.SettingsChanged -= OnSettingsChanged;
-        await autoSwitchService.StopAsync();
-        while (true)
+        autoSwitchService.Start();
+        logger.LogInformation("AutoRP monitoring is ready with a {PollingInterval} polling interval.", options.PollingInterval);
+    }
+
+    public Task StopAsync(CancellationToken cancellationToken = default)
+    {
+        TaskCompletionSource completion;
+        lock (lifecycleLock)
         {
-            Task[] pending;
-            lock (backgroundLock)
+            if (stopTask is not null)
             {
-                pending = backgroundTasks.ToArray();
+                return stopTask;
             }
 
-            if (pending.Length == 0)
+            Interlocked.Exchange(ref stopStarted, 1);
+            completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            stopTask = completion.Task;
+        }
+
+        _ = StopCoreAsync(cancellationToken, completion);
+        return completion.Task;
+    }
+
+    private async Task StopCoreAsync(CancellationToken cancellationToken, TaskCompletionSource completion)
+    {
+        try
+        {
+            autoSwitchService.StateChanged -= OnAutomaticSwitchingStateChanged;
+            settingsService.SettingsChanged -= OnSettingsChanged;
+            Task? startup;
+            lock (lifecycleLock)
             {
-                break;
+                startup = startTask;
             }
 
-            await Task.WhenAll(pending);
-        }
-        if (discordRpcService.IsConnected)
-        {
-            await discordRpcService.ClearPresenceAsync(cancellationToken);
-        }
+            if (startup is not null)
+            {
+                try
+                {
+                    await startup;
+                }
+                catch (OperationCanceledException)
+                {
+                    // Window closure can cancel an in-progress initial connection.
+                }
+                catch (Exception exception)
+                {
+                    logger.LogDebug(exception, "AutoRP startup ended while shutdown was beginning.");
+                }
+            }
 
-        await discordRpcService.DisconnectAsync(cancellationToken);
+            await autoSwitchService.StopAsync();
+            while (true)
+            {
+                Task[] pending;
+                lock (backgroundLock)
+                {
+                    pending = backgroundTasks.ToArray();
+                }
+
+                if (pending.Length == 0)
+                {
+                    break;
+                }
+
+                await Task.WhenAll(pending);
+            }
+
+            try
+            {
+                if (discordRpcService.IsConnected)
+                {
+                    await discordRpcService.ClearPresenceAsync(cancellationToken);
+                }
+            }
+            finally
+            {
+                await discordRpcService.DisconnectAsync(CancellationToken.None);
+            }
+
+            completion.TrySetResult();
+        }
+        catch (Exception exception)
+        {
+            completion.TrySetException(exception);
+        }
     }
 
     public void Dispose()

@@ -16,6 +16,7 @@ public partial class MainWindow : Window
     private readonly ProfileManagementViewModel profileManagementViewModel;
     private readonly ITrayService trayService;
     private readonly SettingsViewModel settingsViewModel;
+    private readonly CancellationTokenSource windowLifetime = new();
 
     public MainWindow(
         PresenceCoordinator presenceCoordinator,
@@ -47,7 +48,24 @@ public partial class MainWindow : Window
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
     {
-        await presenceCoordinator.StartAsync();
+        try
+        {
+            await presenceCoordinator.StartAsync(windowLifetime.Token);
+        }
+        catch (OperationCanceledException) when (windowLifetime.IsCancellationRequested)
+        {
+            return;
+        }
+        catch (Exception exception)
+        {
+            logger.LogError(exception, "AutoRP startup failed.");
+        }
+
+        if (windowLifetime.IsCancellationRequested || !IsLoaded)
+        {
+            return;
+        }
+
         RefreshAutomaticSwitchingState();
         RefreshSettings();
         RefreshRpcStatus();
@@ -56,6 +74,8 @@ public partial class MainWindow : Window
 
     private void OnClosed(object? sender, EventArgs e)
     {
+        windowLifetime.Cancel();
+        windowLifetime.Dispose();
         refreshTimer.Stop();
         Loaded -= OnLoaded;
         Closed -= OnClosed;

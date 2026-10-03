@@ -125,6 +125,59 @@ public sealed class ShutdownTests
     }
 
     [Fact]
+    public async Task ShutdownWaitsForStartupAndDoesNotRestartMonitoringAfterward()
+    {
+        using var loggerFactory = LoggerFactory.Create(builder => { });
+        var activeWindow = new FakeActiveWindowService();
+        var discord = new FakeDiscordRpcService { BlockConnect = true };
+        using var autoSwitch = new AutoSwitchService(
+            activeWindow,
+            new InMemoryProfileManager(),
+            discord,
+            loggerFactory.CreateLogger<AutoSwitchService>());
+        var settings = new JsonSettingsService(
+            loggerFactory.CreateLogger<JsonSettingsService>(),
+            Path.Combine(Path.GetTempPath(), $"autorp-start-stop-{Guid.NewGuid():N}.json"));
+        var coordinator = new PresenceCoordinator(
+            discord,
+            autoSwitch,
+            settings,
+            new Configuration.AutoRpOptions { DiscordApplicationId = string.Empty },
+            loggerFactory.CreateLogger<PresenceCoordinator>());
+
+        var starting = coordinator.StartAsync();
+        await discord.ConnectStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        var stopping = coordinator.StopAsync();
+        Assert.False(stopping.IsCompleted);
+        discord.ReleaseConnect.TrySetResult();
+        await Task.WhenAll(starting, stopping);
+
+        Assert.Equal(0, activeWindow.StartCalls);
+        Assert.Equal(0, activeWindow.StopCalls);
+        Assert.Equal(1, discord.DisconnectCalls);
+        coordinator.Dispose();
+    }
+
+    [Fact]
+    public async Task DiscordAsyncDisposalStopsReconnectAndRejectsLaterWork()
+    {
+        using var loggerFactory = LoggerFactory.Create(builder => { });
+        var settingsPath = Path.Combine(Path.GetTempPath(), $"autorp-discord-dispose-{Guid.NewGuid():N}.json");
+        var settings = new JsonSettingsService(loggerFactory.CreateLogger<JsonSettingsService>(), settingsPath);
+        var service = new DiscordRpcService(
+            new Configuration.AutoRpOptions { DiscordApplicationId = string.Empty },
+            settings,
+            loggerFactory.CreateLogger<DiscordRpcService>());
+
+        await service.ConnectAsync();
+        await service.DisposeAsync();
+        await service.DisposeAsync();
+
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => service.ConnectAsync());
+        if (File.Exists(settingsPath)) File.Delete(settingsPath);
+    }
+
+    [Fact]
     public void TrayDisposalIsSafeToRepeat()
     {
         using var loggerFactory = LoggerFactory.Create(builder => { });
@@ -220,9 +273,19 @@ public sealed class ShutdownTests
         public bool BlockPresenceUpdates { get; init; }
         public TaskCompletionSource PresenceUpdateStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource ReleasePresenceUpdate { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public bool BlockConnect { get; init; }
+        public TaskCompletionSource ConnectStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource ReleaseConnect { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public void MarkDisconnected() => IsConnected = false;
 
-        public Task ConnectAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public async Task ConnectAsync(CancellationToken cancellationToken = default)
+        {
+            if (BlockConnect)
+            {
+                ConnectStarted.TrySetResult();
+                await ReleaseConnect.Task.WaitAsync(cancellationToken);
+            }
+        }
         public Task ReinitializeAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
         public async Task SetPresenceAsync(RpcProfile profile, CancellationToken cancellationToken = default)
         {

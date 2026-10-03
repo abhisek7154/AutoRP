@@ -9,17 +9,21 @@ namespace AutoRP.Services;
 public sealed class DiscordRpcService(
     AutoRpOptions options,
     ISettingsService settingsService,
-    ILogger<DiscordRpcService> logger) : IDiscordRpcService, IDisposable
+    ILogger<DiscordRpcService> logger) : IDiscordRpcService, IAsyncDisposable
 {
     private static readonly TimeSpan ReconnectInterval = TimeSpan.FromSeconds(5);
     private readonly SemaphoreSlim connectionGate = new(1, 1);
     private readonly object stateLock = new();
+    private readonly object reconnectTasksLock = new();
+    private readonly HashSet<Task> reconnectTasks = [];
+    private readonly object disposeLock = new();
     private DiscordRpcClient? client;
     private Timer? reconnectTimer;
     private RpcProfile? lastProfile;
     private bool isConnected;
-    private bool isDisposed;
+    private int isDisposed;
     private long reconnectGeneration;
+    private Task? disposeTask;
 
     public event EventHandler<DiscordConnectionStatusChangedEventArgs>? ConnectionStatusChanged;
 
@@ -92,6 +96,7 @@ public sealed class DiscordRpcService(
         await connectionGate.WaitAsync(cancellationToken);
         try
         {
+            EnsureNotDisposed();
             if (client is not null && IsConnected)
             {
                 client.ClearPresence();
@@ -130,16 +135,22 @@ public sealed class DiscordRpcService(
         }
     }
 
-    public void Dispose()
+    public ValueTask DisposeAsync()
     {
-        if (isDisposed)
+        TaskCompletionSource completion;
+        lock (disposeLock)
         {
-            return;
+            if (disposeTask is not null)
+            {
+                return new ValueTask(disposeTask);
+            }
+
+            completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            disposeTask = completion.Task;
         }
 
-        isDisposed = true;
-        DisconnectAsync().GetAwaiter().GetResult();
-        connectionGate.Dispose();
+        _ = DisposeCoreAsync(completion);
+        return new ValueTask(completion.Task);
     }
 
     private void TryConnect()
@@ -181,6 +192,11 @@ public sealed class DiscordRpcService(
 
     private void ScheduleReconnect()
     {
+        if (Volatile.Read(ref isDisposed) != 0)
+        {
+            return;
+        }
+
         if (reconnectTimer is not null)
         {
             return;
@@ -191,7 +207,7 @@ public sealed class DiscordRpcService(
             static state =>
             {
                 var (service, timerGeneration) = ((DiscordRpcService Service, long Generation))state!;
-                _ = service.ReconnectFromTimerAsync(timerGeneration);
+                service.QueueReconnectAttempt(timerGeneration);
             },
             (this, generation),
             ReconnectInterval,
@@ -200,7 +216,7 @@ public sealed class DiscordRpcService(
 
     private async Task ReconnectFromTimerAsync(long generation)
     {
-        if (isDisposed || generation != Volatile.Read(ref reconnectGeneration))
+        if (Volatile.Read(ref isDisposed) != 0 || generation != Volatile.Read(ref reconnectGeneration))
         {
             return;
         }
@@ -210,7 +226,7 @@ public sealed class DiscordRpcService(
             await connectionGate.WaitAsync();
             try
             {
-                if (isDisposed || generation != Volatile.Read(ref reconnectGeneration))
+                if (Volatile.Read(ref isDisposed) != 0 || generation != Volatile.Read(ref reconnectGeneration))
                 {
                     return;
                 }
@@ -226,6 +242,62 @@ public sealed class DiscordRpcService(
         {
             logger.LogDebug(exception, "Discord reconnect attempt failed.");
         }
+    }
+
+    private async Task DisposeCoreAsync(TaskCompletionSource completion)
+    {
+        Interlocked.Exchange(ref isDisposed, 1);
+        Interlocked.Increment(ref reconnectGeneration);
+        try
+        {
+            await DisconnectAsync();
+            while (true)
+            {
+                Task[] pending;
+                lock (reconnectTasksLock)
+                {
+                    pending = reconnectTasks.ToArray();
+                }
+
+                if (pending.Length == 0)
+                {
+                    break;
+                }
+
+                await Task.WhenAll(pending);
+            }
+
+            ConnectionStatusChanged = null;
+            completion.TrySetResult();
+        }
+        catch (Exception exception)
+        {
+            completion.TrySetException(exception);
+        }
+    }
+
+    private void QueueReconnectAttempt(long generation)
+    {
+        Task task;
+        lock (reconnectTasksLock)
+        {
+            if (Volatile.Read(ref isDisposed) != 0)
+            {
+                return;
+            }
+
+            task = ReconnectFromTimerAsync(generation);
+            reconnectTasks.Add(task);
+        }
+
+        _ = task.ContinueWith(completed =>
+        {
+            _ = completed.Exception;
+            lock (reconnectTasksLock)
+            {
+                reconnectTasks.Remove(completed);
+            }
+        }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
     }
 
     private void HandleConnectionFailure(Exception exception)
@@ -309,6 +381,6 @@ public sealed class DiscordRpcService(
 
     private void EnsureNotDisposed()
     {
-        ObjectDisposedException.ThrowIf(isDisposed, this);
+        ObjectDisposedException.ThrowIf(Volatile.Read(ref isDisposed) != 0, this);
     }
 }
