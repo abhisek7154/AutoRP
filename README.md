@@ -1,8 +1,12 @@
 # AutoRP
 
-<img width="1312" height="1199" alt="Untitled1111" src="https://github.com/user-attachments/assets/4abd127e-8dda-41b3-b466-e83606e9e850" />
+<img width="1312" height="1199" alt="AutoRP" src="https://github.com/user-attachments/assets/4abd127e-8dda-41b3-b466-e83606e9e850" />
 
 AutoRP automatically changes your Discord Rich Presence based on the Windows application you're using.
+
+## 🎥 AutoRP in Action
+
+<video src="https://github.com/user-attachments/assets/4bc9e42a-9749-429a-84e5-12011d01cc5a" controls width="100%"></video>
 
 ## Quick Start
 
