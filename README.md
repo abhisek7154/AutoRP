@@ -4,10 +4,6 @@
 
 AutoRP automatically changes your Discord Rich Presence based on the Windows application you're using.
 
-## 🎥 AutoRP in Action
-
-<video src="https://github.com/user-attachments/assets/4bc9e42a-9749-429a-84e5-12011d01cc5a" controls width="100%"></video>
-
 ## Quick Start
 
 1. Download the AutoRP Windows ZIP, extract it, and run `AutoRP.exe`.
